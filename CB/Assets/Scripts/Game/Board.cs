@@ -9,13 +9,13 @@ public class Board : MonoBehaviour, IBoard
 {
     public int MatchCount = 3;
     private  int MATCH_COUNT => MatchCount;
-    public int SIZE = 8;
-    private const int BOARD_SIZE = 8;
+    public int SIZE = 7;
+    private const int BOARD_SIZE = 7;
     private const int INIT_BRICK_COUNT = 4;
     private const int BRICK_TYPES = (int)BrickType.MAX;
     private const float TOUCH_GAP = 0.5f;
     private const float TOUCH_LENGTH = 150f;
-    private readonly float[] POS_ARR = new float[] { -2.1f, -1.5f, -0.9f, -0.3f, 0.3f, 0.9f, 1.5f, 2.1f };
+    private readonly float[] POS_ARR = new float[] { -2.1f, -1.4f, -0.7f, 0f, 0.7f, 1.4f, 2.1f };
     private bool _isDrag = false;
     private bool _isSlide = false;
     private Vector2 _beginPos = Vector2.zero;
