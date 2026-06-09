@@ -1,5 +1,6 @@
 using Cysharp.Threading.Tasks;
 using UnityEngine;
+using static UnityEngine.InputSystem.InputAction;
 
 
 [ManagerOrder(4)]

@@ -7,6 +7,10 @@ public class SettingUI : BaseUI
         base.Init();
     }
 
+    public void OnClickRetryBtn()
+    {
+    }
+
     public void OnClickBackBtn()
     {
         OnClickCloseBtn();

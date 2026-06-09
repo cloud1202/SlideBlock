@@ -22,13 +22,13 @@ public class AddressableManager : SingletonInstance<AddressableManager>
 
     private async UniTask LoadRemoteAddressable()
     {
-        long downloadSize = await Addressables.GetDownloadSizeAsync("Resources");
+        long downloadSize = await Addressables.GetDownloadSizeAsync("default");
         if (downloadSize == 0)
         {
             Logging($"Not Found Download Addressable");
             return;
         }
-        var downloadHandle = Addressables.DownloadDependenciesAsync("Resources", false);
+        var downloadHandle = Addressables.DownloadDependenciesAsync("default", false);
         float progress = 0;
 
         while (downloadHandle.Status == AsyncOperationStatus.None)

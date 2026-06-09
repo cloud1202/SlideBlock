@@ -3,9 +3,9 @@ using UnityEngine.UI;
 
 public static class Utility
 {
-    public static int RandomInt(int minInclusive, int maxExclusive)
+    public static int RandomInt(int max = int.MaxValue, int min = 0)
     {
-        return Random.Range(minInclusive, maxExclusive);
+        return Random.Range(min, max);
     }
 
     public static void SetResizeScale(this Image image)

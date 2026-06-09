@@ -27,6 +27,9 @@ public class InputManager : SingletonInstance<InputManager>, IManager
             case InputType.Player_Point:
                 input = _inputHandler.Player.Point;
                 break;
+            case InputType.Game_Retry:
+                input = _inputHandler.Player.Retry;
+                break;
             default:
                 return;
         }

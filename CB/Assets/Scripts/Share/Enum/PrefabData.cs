@@ -1,8 +1,8 @@
 
 public enum PrefabData
 {
-    Player = 0,
-    Ground,
+    Brick = 0,
+    Board,
 
     MainCanvas = 100,
     LobbyUI,
