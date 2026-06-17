@@ -48,12 +48,12 @@ public class ComboObject : MonoBehaviour
         if(_digits.Count < digits.Length)
             CreateDigit(digits.Length - _digits.Count);
 
-        List<UniTask> tasks = new List<UniTask>() { Utility.ToastGraphicObject(_title) };
+        List<UniTask> tasks = new List<UniTask>() { Utility.AsyncToastGraphicObject(_title) };
 
         for (int i = 0; i < digits.Length; ++i)
         {
             _digits[i].sprite = digits[i];
-            tasks.Add(Utility.ToastGraphicObject(_digits[i]));
+            tasks.Add(Utility.AsyncToastGraphicObject(_digits[i]));
         }
 
         for (int i = digits.Length; i < _digits.Count; ++i)

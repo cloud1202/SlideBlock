@@ -158,6 +158,7 @@ public class Board : RoundObject
 
         bool isCompleteSpawn = TrySpawnBrick();
 
+        await DestroyMatches();
         if (isCompleteSpawn == false)
         {
             _roundManager.EndRound();
@@ -237,7 +238,6 @@ public class Board : RoundObject
                 _bricks.Enqueue(b);
                 bounds.Encapsulate(b.transform.position);
             });
-
             _roundManager.DestroyMatchBricks(score, bounds.center);
         }
 

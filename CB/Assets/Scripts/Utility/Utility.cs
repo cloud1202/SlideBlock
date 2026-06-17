@@ -1,10 +1,11 @@
-using System.Runtime.CompilerServices;
+﻿using System.Runtime.CompilerServices;
 using UnityEngine;
 using UnityEngine.UI;
 using DG.Tweening;
 using System;
 using Cysharp.Threading.Tasks;
 using System.Threading.Tasks;
+using System.Threading;
 
 public static class Utility
 {
@@ -26,7 +27,7 @@ public static class Utility
         return Mathf.RoundToInt(score * (combo + 1) * 0.5f);
     }
 
-    public static async UniTask ToastGraphicObject(Graphic graphic)
+    public static async UniTask AsyncToastGraphicObject(Graphic graphic)
     {
         var posY = graphic.rectTransform.anchoredPosition.y;
         var tween =  DOTween.Sequence().SetAutoKill(true);
@@ -39,6 +40,42 @@ public static class Utility
         tween.Play();
 
         await tween.AsyncWaitForKill();
+    }
+
+    public static async UniTask AsyncVibrateObject(Transform transform, CancellationTokenSource tokenSource, VibrateData data = null)
+    {
+        if(data == null)
+            data = new VibrateData();
+        float elapsed = 0f;
+        Vector3 origin = new Vector3(0f, transform.position.y);
+
+        // 콤보 지속 구간
+        while (!tokenSource.IsCancellationRequested)
+        {
+            elapsed += Time.deltaTime;
+            float offset = data.amplitude * Mathf.Sin(2f * Mathf.PI * data.frequency * elapsed);
+            transform.position = origin + new Vector3(offset, 0f, 0f);
+            await UniTask.Yield(tokenSource.Token).SuppressCancellationThrow();
+        }
+
+        // 감쇠 구간 — Cancel 시점의 위상 그대로 이어받음
+        float decayElapsed = 0f;
+        // Cancel 직전 offset을 시작 진폭으로 캡처
+        float currentOffset = (transform.position - origin).x;
+        float startAmplitude = Mathf.Abs(currentOffset);
+
+        while (decayElapsed < data.duration)
+        {
+            decayElapsed += Time.deltaTime;
+            float t = decayElapsed / data.duration;
+            float envelope = 1f - t;
+            float offset = data.amplitude * envelope
+                           * Mathf.Sin(2f * Mathf.PI * data.frequency * (elapsed + decayElapsed));
+            transform.position = origin + new Vector3(offset, 0f, 0f);
+            await UniTask.Yield(PlayerLoopTiming.Update);  // 감쇠 구간은 새 token 없이
+        }
+
+        transform.position = origin;
     }
 
     public static int[] GetDigits(int value)

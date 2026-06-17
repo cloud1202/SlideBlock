@@ -8,5 +8,5 @@ public interface IScore : IBaseUI
 
     public void SetScores();
 
-    public void UpdateCombo(int comboValue, Vector2 boundCenter = default); 
+    public void UpdateCombo(int comboValue, Vector2 boundCenter = default);
 }

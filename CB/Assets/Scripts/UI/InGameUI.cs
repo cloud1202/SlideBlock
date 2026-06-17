@@ -1,6 +1,5 @@
 using Cysharp.Threading.Tasks;
-using DG.Tweening;
-using System.Collections.Generic;
+using System.Threading;
 using TMPro;
 using UnityEngine;
 
@@ -8,8 +7,11 @@ public class InGameUI : BaseUI, IScore
 {
     [SerializeField] private TextMeshProUGUI _highScore;
     [SerializeField] private TextMeshProUGUI _score;
+    [SerializeField] private IngameScoreObject _scoreObj;
     [SerializeField] private ToastCombo _combo;
 
+    private VibrateData _vibrationData = new VibrateData();
+    private CancellationTokenSource _vibrationToken= null;
     private IBaseUI _menuUI;
 
     public override void Init()
@@ -26,20 +28,42 @@ public class InGameUI : BaseUI, IScore
     }
     public void SetScores()
     {
+        _vibrationData.ResetData();
+        ResetToken();
         SetScore(0);
 
-        _highScore.text = GameManager.Instance.HighScore.ToString();
+        _highScore.text = Utility.NumberRegularExpression(GameManager.Instance.HighScore);
     }
 
     public void SetScore(int score)
     {
         _score.text = Utility.NumberRegularExpression(score);
-        LLogger.Log($"Score :: {score}");
     }
 
     public void UpdateCombo(int comboValue, Vector2 boundCenter)
     {
+        if(comboValue == 0)
+        {
+            ResetToken();
+            return;
+        }
+
+        if (_vibrationToken == null)
+        {
+            _vibrationData.InitData();
+            _vibrationToken = new CancellationTokenSource();
+            Utility.AsyncVibrateObject(_score.transform.parent, _vibrationToken, _vibrationData).Forget();
+        }
+        _vibrationData.UpdateFrequency(comboValue);
+        _scoreObj.Burst(0, _vibrationToken.Token);
         _combo.SetCombo(comboValue, boundCenter).Forget();
+    }
+
+    private void ResetToken()
+    {
+        _vibrationToken?.Cancel();
+        _vibrationToken?.Dispose();
+        _vibrationToken = null;
     }
 
     public void OnClickMenuBtn()

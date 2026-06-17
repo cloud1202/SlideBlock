@@ -1,5 +1,6 @@
 using Cysharp.Threading.Tasks;
 using UnityEngine;
+using UnityEngine.SocialPlatforms.Impl;
 
 public class RoundManager : MonoBehaviour, IRound
 {
@@ -55,6 +56,7 @@ public class RoundManager : MonoBehaviour, IRound
     public void DestroyMatchBricks(int addScore, Vector2 boundCenter)
     {
         UpdateCombo(addScore > 0, boundCenter);
+        LLogger.Log($"Combo :: {_comboValue}, Score :: {addScore}");
 
         _scoreValue += Utility.CalcScore(addScore, _comboValue);
         _score.SetScore(_scoreValue);
@@ -66,7 +68,6 @@ public class RoundManager : MonoBehaviour, IRound
             return;
 
         _comboValue++;
-        LLogger.Log($"Combo!! : {_comboValue}");
         _score.UpdateCombo(_comboValue, boundCenter);
         _timer.Start();
         _maxCombo = Mathf.Max(_comboValue, _maxCombo);
@@ -75,6 +76,7 @@ public class RoundManager : MonoBehaviour, IRound
     private void ResetCombo()
     {
         _comboValue = 0;
+        _score.UpdateCombo(_comboValue, Vector2.zero);
         _timer.Reset();
     }
 }
