@@ -1,4 +1,5 @@
 using Cysharp.Threading.Tasks;
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.AddressableAssets;
@@ -98,32 +99,33 @@ public class AddressableManager : SingletonInstance<AddressableManager>
         if (_loadHandles.ContainsKey(label) == false)
             _loadHandles.Add(label, new List<AsyncOperationHandle>());
 
-        List<UniTask<UnityEngine.Object>> handles = new List<UniTask<UnityEngine.Object>>();
+        List<UniTask<GameObject>> handles = new List<UniTask<GameObject>>();
 
         Logging($"PreLoad Asset : {label}");
         int length = assetResources.Length;
         for (int index = 0; index < length; ++index)
         {
-            if (assetResources[index].assetRef.OperationHandle.IsValid())
+            if (assetResources[index].isValid)
                 continue;
-            var loadHandle = assetResources[index].assetRef.LoadAssetAsync<UnityEngine.Object>();
+            var loadHandle = assetResources[index].LoadAsset(OnComplete);
             _loadHandles[label].Add(loadHandle);
             handles.Add(loadHandle.ToUniTask());
-            loadHandle.Completed += (handle) =>
-            {
-                if (handle.Status == AsyncOperationStatus.Succeeded && handle.Result != null)
-                {
-                    Logging($"loadHandle Asset : {handle.Result.ToString()}");
-                }
-                else
-                {
-                    Logging($"Error Load Asset : {handle.OperationException}");
-                }
-            };
         }
 
         await UniTask.WhenAll(handles);
         Logging($"Complete PreLoad Assets");
+
+        void OnComplete(AsyncOperationHandle<GameObject> handle)
+        {
+            if (handle.Status == AsyncOperationStatus.Succeeded && handle.Result != null)
+            {
+                Logging($"loadHandle Asset : {handle.Result.ToString()}");
+            }
+            else
+            {
+                Logging($"Error Load Asset : {handle.OperationException}");
+            }
+        }
     }
 
     public async UniTask<T> Load<T>(AssetReference assetRef) where T : UnityEngine.Object
@@ -161,25 +163,17 @@ public class AddressableManager : SingletonInstance<AddressableManager>
     }
 
     public async UniTask<T> Instantiate<T>(IAssetResource assetResource, Transform parent, bool isProtected)
-        where T : UnityEngine.Object
     {
         //await Load<GameObject>(assetRef);
 
-        AsyncOperationHandle instantiateHandle = assetResource.assetRef.InstantiateAsync(parent);
-        await instantiateHandle.ToUniTask();
-
-        var go = instantiateHandle.Result as GameObject;
+        var go = await assetResource.InstantiateAsync<GameObject>(parent);
         var obj = go.AddComponent<InstantiateObject>();
-        assetResource.instance = go;
         if (isProtected == false)
             _instantiateHandles.Add(go);
 
         obj.SetAssetReference(assetResource);
 
-        if(typeof(T) == typeof(GameObject))
-            return go as T;
-        else
-            return go.GetComponent<T>();
+        return go.GetComponent<T>();
     }
 
 

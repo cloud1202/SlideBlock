@@ -1,8 +1,15 @@
-using UnityEngine.AddressableAssets;
+using Cysharp.Threading.Tasks;
+using System;
+using UnityEngine;
+using UnityEngine.ResourceManagement.AsyncOperations;
 
 public interface IAssetResource
 {
-    public AssetReference assetRef { get; }
-    public UnityEngine.Object instance { get; set; }
+    public GameObject instance { get; }
     public bool isInstance { get; }
+
+    public bool isValid { get; }
+    public AsyncOperationHandle<GameObject> LoadAsset(Action<AsyncOperationHandle<GameObject>> complete);
+    public UniTask<T> InstantiateAsync<T>(Transform parent);
+    public void ReleaseAsset();
 }

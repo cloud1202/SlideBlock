@@ -24,26 +24,26 @@ public class SoundSettingUI : MonoBehaviour
     void Start()
     {
         // 저장된 값 불러오기
-        float allVol = PlayerPrefs.GetFloat("VolumeAll", SoundManager.Instance.SoundVolumPer);
+        //float allVol = PlayerPrefs.GetFloat("VolumeAll", SoundManager.Instance.SoundVolumPer);
         float bgmVol = PlayerPrefs.GetFloat("VolumeBGM", SoundManager.Instance.BGMVolumPer);
         float sfxVol = PlayerPrefs.GetFloat("VolumeSFX", SoundManager.Instance.SFXVolumPer);
 
         // 슬라이더 초기값 설정 (이벤트 없이)
-        _allSlider.SetValueWithoutNotify(allVol);
+        //_allSlider.SetValueWithoutNotify(allVol);
         _bgmSlider.SetValueWithoutNotify(bgmVol);
         _sfxSlider.SetValueWithoutNotify(sfxVol);
 
-        UpdateValueText(_allValueText, allVol);
+        //UpdateValueText(_allValueText, allVol);
         UpdateValueText(_bgmValueText, bgmVol);
         UpdateValueText(_sfxValueText, sfxVol);
 
         // 이벤트 등록
-        _allSlider.onValueChanged.AddListener(OnAllVolumeChanged);
+        //_allSlider.onValueChanged.AddListener(OnAllVolumeChanged);
         _bgmSlider.onValueChanged.AddListener(OnBGMVolumeChanged);
         _sfxSlider.onValueChanged.AddListener(OnSFXVolumeChanged);
 
         // SoundManager에 적용
-        ApplyAll(allVol);
+        //ApplyAll(allVol);
         ApplyBGM(bgmVol);
         ApplySFX(sfxVol);
     }

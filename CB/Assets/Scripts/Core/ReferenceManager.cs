@@ -47,7 +47,7 @@ public class ReferenceManager<T, E> : SingletonInstance<T>
         await AddressableManager.Instance.PreloadAssets(label, assets.ToArray());
     }
 
-    public async UniTask<TI> InstantiateObject<TI>(E data, Transform parent = null, bool isProtected = false) where TI : UnityEngine.Object
+    public async UniTask<TI> InstantiateObject<TI>(E data, Transform parent = null, bool isProtected = false)
     {
         if (_assetMap.TryGetValue(data, out var obj) == false)
         {

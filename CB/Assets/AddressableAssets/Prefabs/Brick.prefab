@@ -74,15 +74,15 @@ SpriteRenderer:
   m_AutoUVMaxDistance: 0.5
   m_AutoUVMaxAngle: 89
   m_LightmapParameters: {fileID: 0}
-  m_SortingLayerID: 0
-  m_SortingLayer: 0
+  m_SortingLayerID: 2144707371
+  m_SortingLayer: 2
   m_SortingOrder: 1
-  m_Sprite: {fileID: 1944468160, guid: 010feab60c4081643bbd389f811436df, type: 3}
+  m_Sprite: {fileID: 21300000, guid: f1953fdc82c00f6429a47ec842b72ef0, type: 3}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_FlipX: 0
   m_FlipY: 0
   m_DrawMode: 0
-  m_Size: {x: 0.6, y: 0.6}
+  m_Size: {x: 0.64, y: 0.64}
   m_AdaptiveModeThreshold: 0.5
   m_SpriteTileMode: 0
   m_WasSpriteAssigned: 1
@@ -100,7 +100,3 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 39e731454e1f2ff48a492f9f4eb13a55, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  R: 0
-  C: 0
-  _bricks: {fileID: 100100200, guid: 0839c89574dd4b84398cfead1e61f7a5, type: 3}
-  _renderer: {fileID: 7642679682427237343}

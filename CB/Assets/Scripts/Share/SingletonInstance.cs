@@ -44,17 +44,18 @@ public class SingletonInstance<T> : MonoBehaviour
         else
             DestroyImmediate(gameObject);
     }
+
     protected void Logging(string log)
     {
-        Debug.Log($"<color=yellow>[{typeof(T)}]</color> {log}");
+        LLogger.Log(log,color: Colors.Yellow, skipFrames:1);
     }
     protected void Warning(string log)
     {
-        Debug.LogWarning($"[{typeof(T)}] {log}");
+        LLogger.Log(log, level:LLogger.LogLevel.Warning, skipFrames: 2);
     }
 
     protected void Error(string log)
     {
-        Debug.LogError($"[{typeof(T)}] {log}");
+        LLogger.Log(log, level: LLogger.LogLevel.Error, skipFrames: 2);
     }
 }

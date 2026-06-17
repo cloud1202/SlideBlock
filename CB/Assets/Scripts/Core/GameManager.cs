@@ -1,30 +1,45 @@
 using Cysharp.Threading.Tasks;
-using System;
-using System.Collections.Generic;
 using UnityEngine;
-using static UnityEngine.InputSystem.InputAction;
 
 public class GameManager : SingletonInstance<GameManager>, IManager
 {
-    private IBoard _board;
+    public int HighScore { get; private set; }
+    private IRound _roundManager;
+    private IBaseUI _lobbyUI;
     async public UniTask Bootstrap()
     {
+        HighScore = PlayerPrefs.GetInt("HighScore",0);
         await AddressableManager.Instance.SetAddressable();
         await PrefabManager.Instance.LoadAssetReference();
-        await PrefabManager.Instance.LoadCanvas();
-        await PrefabManager.Instance.LoadLobbyUI();
-        var board =  await PrefabManager.Instance.InstantiateObject<GameObject>(PrefabData.Board);
-        _board = board.GetComponent<IBoard>();
-        InputManager.Instance.SubscribeToInputHandler(InputType.Game_Retry, RestartGame);
+        await PrefabManager.Instance.InitLoadObjects();
+        _lobbyUI = await PrefabManager.Instance.InstantiateUI<IBaseUI>(PrefabData.LobbyUI);
+
+        _lobbyUI.Init();
     }
 
-    public async UniTask StartGame()
+    async public UniTask StartRound()
     {
-        //await PlayerManager.Instance.SpawnLocalPlayer();
+        if (_roundManager == null)
+        {
+            _roundManager = await PrefabManager.Instance.InstantiateObject<IRound>(PrefabData.RoundManager);
+            await _roundManager.Init();
+        }
+
+        _lobbyUI.Close();
+        _roundManager.EnterRound();
     }
 
-    public void RestartGame(CallbackContext context)
+    public void ExitRound()
     {
-        _board.ResetBoard();
+        if (_roundManager == null)
+            return;
+
+        _roundManager.ExitRound();
+        _roundManager = null;
+        _lobbyUI.Init();
+    }
+
+    public void ScoreApply(int score)
+    {
     }
 }

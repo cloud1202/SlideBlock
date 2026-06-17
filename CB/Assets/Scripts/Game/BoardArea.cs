@@ -15,6 +15,10 @@ public struct BoardArea
         this.col = col;
         this.posY = posY;
         this.posX = posX;
+
+        if (brick != null)
+            GameObject.DestroyImmediate(brick.gameObject);
+
         this.brick = null;
     }
 
@@ -28,12 +32,6 @@ public struct BoardArea
 
     public void SetBrick(Brick brick = null)
     {
-        if (brick != null && this.brick != null)
-            Debug.Log($"Set Brick");
-        if (brick == null)
-            this.brick.SetPos(-1, -1);
-        else
-            brick.SetPos(row, col);
         this.brick = brick;
     }
 

@@ -15,10 +15,16 @@ MonoBehaviour:
   m_GroupName: Default Local Group
   m_GUID: fde44a71ee3142948bce1f5ce136df86
   m_SerializeEntries:
+  - m_GUID: 85350b65fe3f08c4fb441c2ad688a2a1
+    m_Address: Assets/AddressableAssets/Sprites
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: d0fc05056fc99784f9dff7904b1b62fa
     m_Address: Assets/AddressableAssets/ScriptableObject
     m_ReadOnly: 0
-    m_SerializedLabels: []
+    m_SerializedLabels:
+    - default
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: e70a02734067ff04a81a81c20113da64
     m_Address: Assets/AddressableAssets/Prefabs

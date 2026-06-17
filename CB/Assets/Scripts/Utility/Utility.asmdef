@@ -5,11 +5,14 @@
         "Unity.Addressables",
         "UniTask",
         "UniTask.Addressables",
-        "Unity.ResourceManager"
+        "Unity.ResourceManager",
+        "Plugins",
+        "Unity.TextMeshPro",
+        "UniTask.DOTween"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],
-    "allowUnsafeCode": false,
+    "allowUnsafeCode": true,
     "overrideReferences": false,
     "precompiledReferences": [],
     "autoReferenced": true,

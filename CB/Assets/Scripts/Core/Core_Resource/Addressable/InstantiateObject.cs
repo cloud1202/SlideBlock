@@ -11,8 +11,6 @@ public class InstantiateObject : MonoBehaviour
     }
     private void OnDestroy()
     {
-        m_assetRef.instance = null;
-        m_assetRef.assetRef.ReleaseAsset();
-        m_assetRef.assetRef.ReleaseInstance(gameObject);
+        m_assetRef.ReleaseAsset();
     }
 }
