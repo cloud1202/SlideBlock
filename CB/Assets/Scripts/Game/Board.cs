@@ -1,8 +1,8 @@
 using Cysharp.Threading.Tasks;
 using System;
 using System.Collections.Generic;
+using System.Threading;
 using UnityEngine;
-using UnityEngine.Events;
 using static UnityEngine.InputSystem.InputAction;
 
 
@@ -21,6 +21,7 @@ public class Board : RoundObject
     private Vector2 _beginPos = Vector2.zero;
     private BoardArea[,] _boardAreas = new BoardArea[BOARD_SIZE, BOARD_SIZE];
     private Queue<Brick> _bricks = new Queue<Brick>();
+    private CancellationTokenSource _changeDirectionToken;
 
     private (int r, int c)[] offset = new (int r, int c)[4]
     {
@@ -45,23 +46,39 @@ public class Board : RoundObject
         InputManager.Instance.SubscribeToInputHandler(InputType.Player_Touch, OnTouchPoint, cancel: OnEndTouchPoint);
         InputManager.Instance.SubscribeToInputHandler(InputType.Player_Point, perform: OnDragPoint);
 
-        _boardDirection = BoardDirection.None;
         _bricks.Clear();
     }
 
     private void OnDestroy()
     {
+        ResetToken();
         InputManager.Instance.UnsubscribeToInputHandler(InputType.Player_Touch, OnTouchPoint, cancel: OnEndTouchPoint);
         InputManager.Instance.UnsubscribeToInputHandler(InputType.Player_Point, perform: OnDragPoint);
     }
 
     public override void Init()
     {
+        ResetToken();
         for (int i = 0; i < BOARD_SIZE; i++)
             for (int j = 0; j < BOARD_SIZE; j++)
+            {
+                Brick brick = _boardAreas[i, j].brick;
+                if (brick != null)
+                    _bricks.Enqueue(brick);
                 _boardAreas[i, j].Init(i, j, POS_ARR[i], POS_ARR[j]);
-
+            }
+        _changeDirectionToken = new CancellationTokenSource();
         InitBrick().Forget();
+        _boardDirection = BoardDirection.None;
+        _isDrag = false;
+        _isSlide = false;
+    }
+
+    public void ResetToken()
+    {
+        _changeDirectionToken?.Cancel();
+        _changeDirectionToken?.Dispose();
+        _changeDirectionToken = null;
     }
 
     async private UniTask InitBrick()
@@ -124,6 +141,7 @@ public class Board : RoundObject
         if (dir.magnitude <= TOUCH_LENGTH)
             return;
 
+        _beginPos = Vector2.zero;
         _isDrag = false;
         if (dir.normalized.x < -TOUCH_GAP)
             _boardDirection = BoardDirection.Left;
@@ -134,7 +152,7 @@ public class Board : RoundObject
         else if (dir.normalized.y > TOUCH_GAP)
             _boardDirection = BoardDirection.Up;
 
-        ChangeBoardDirection().Forget();
+        ChangeBoardDirection(_changeDirectionToken.Token).Forget();
     }
 
     private void OnEndTouchPoint(CallbackContext context)
@@ -143,7 +161,7 @@ public class Board : RoundObject
         _isDrag = false;
     }
 
-    async private UniTask ChangeBoardDirection()
+    async private UniTask ChangeBoardDirection(CancellationToken ct)
     {
         _isSlide = true;
         bool anyDestroyed = false;
@@ -151,18 +169,20 @@ public class Board : RoundObject
         do
         {
             SlideAll();
-            await UniTask.WaitForSeconds(0.2f);
-            anyDestroyed = await DestroyMatches();
+            await UniTask.WaitForSeconds(0.2f, cancellationToken: ct);
+            anyDestroyed = await DestroyMatches(ct);
         }
         while (anyDestroyed);
 
         bool isCompleteSpawn = TrySpawnBrick();
 
-        await DestroyMatches();
         if (isCompleteSpawn == false)
         {
+            ResetToken();
             _roundManager.EndRound();
+            return;
         }
+        await DestroyMatches(ct);
 
         _isSlide = false;
     }
@@ -210,7 +230,7 @@ public class Board : RoundObject
             _ => throw new ArgumentException()
         };
 
-    async private UniTask<bool> DestroyMatches()
+    async private UniTask<bool> DestroyMatches(CancellationToken ct)
     {
         List<List<Brick>> toDestroyBricks = new List<List<Brick>>();
         for(int i = 0; i < BOARD_SIZE; ++i)
@@ -244,7 +264,8 @@ public class Board : RoundObject
 
         if (toDestroyBricks.Count > 0)
         {
-            await UniTask.WaitForSeconds(0.4f);
+            await SoundManager.Instance.PlaySFX(SoundData.Match);
+            await UniTask.WaitForSeconds(0.4f, cancellationToken: ct);
             return true;
         }
         else

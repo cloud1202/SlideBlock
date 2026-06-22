@@ -10,7 +10,7 @@ public class AdmobManager : SingletonInstance<AdmobManager>, IManager
         // Google Mobile Ads SDK ÃÊ±âÈ­
         MobileAds.Initialize(initStatus => { });
 
-        CreateBanner();
+        //CreateBanner();
     }
 
     private void CreateBanner()

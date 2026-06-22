@@ -1,12 +1,12 @@
 
 public enum SoundData
 {
+    None = -1,
     // BGM
     Lobby = 0,
-    Ingame = 0,
+    Ingame ,
     // SFX
     Click = 100,
-    Shooting,
-    Collision,
-    Die,
+    Match,
+    Confetti,
 }

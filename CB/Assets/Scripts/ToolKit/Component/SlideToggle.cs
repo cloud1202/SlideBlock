@@ -7,8 +7,12 @@ using DG.Tweening;
 
 public class SlideToggle : MonoBehaviour
 {
+    [Header("Resoruce")]
+    [SerializeField] private Sprite[] _handles;
+    [SerializeField] private Sprite[] _backgrounds;
     [Header("References")]
     [SerializeField] private Image _handle;
+    [SerializeField] private Image _background;
 
     [Header("Settings")]
     [Tooltip("This RectTransform Width 1/4 °ª")]
@@ -21,6 +25,7 @@ public class SlideToggle : MonoBehaviour
     [Header("State")]
     [SerializeField] private bool _isOn;
 
+    private bool _isInit = true;
     public bool IsOn
     {
         get => _isOn;
@@ -29,7 +34,12 @@ public class SlideToggle : MonoBehaviour
 
     public event System.Action<bool> OnValueChanged;
 
-    private void SetState(bool isOn)
+    public void SetValueWithoutNotify(bool isOn)
+    {
+        SetState(isOn, false);
+    }
+
+    private void SetState(bool isOn, bool sendCallback = true)
     {
         _isOn = isOn;
         float targetX = _isOn ? _onX : _offX;
@@ -38,9 +48,19 @@ public class SlideToggle : MonoBehaviour
 
         if (Application.isPlaying)
         {
-            _handle.rectTransform
+            _handle.sprite = _handles[isOn.GetHashCode()];
+            _background.sprite = _backgrounds[isOn.GetHashCode()];
+            if (!_isInit)
+            {
+                _handle.rectTransform
                    .DOLocalMoveX(targetX, _duration)
                    .SetEase(_ease);
+            }
+            else
+            {
+                _handle.rectTransform.localPosition = new Vector3(targetX, _handle.rectTransform.localPosition.y, _handle.rectTransform.localPosition.z);
+            }
+            _isInit = false;
         }
 #if UNITY_EDITOR
         else
@@ -48,7 +68,8 @@ public class SlideToggle : MonoBehaviour
             EditorSlideAnimate(targetX);
         }
 #endif
-        OnValueChanged?.Invoke(_isOn);
+        if(sendCallback)
+            OnValueChanged?.Invoke(_isOn);
     }
 
     public void Toggle() => SetState(!_isOn);

@@ -1,8 +1,8 @@
-using UnityEngine;
-using System.Collections.Generic;
-using UnityEngine.AddressableAssets;
-using System;
 using Cysharp.Threading.Tasks;
+using System;
+using System.Collections.Generic;
+using UnityEngine;
+using UnityEngine.AddressableAssets;
 using UnityEngine.ResourceManagement.AsyncOperations;
 
 public class AssetReferenceBase<E, T> : ScriptableObject
@@ -13,30 +13,35 @@ public class AssetReferenceBase<E, T> : ScriptableObject
     public class AssetResource : IAssetResource
     {
         public E id;
+        public int Index => EnumConverter.Enum32ToInt(id);
         public AssetReferenceT<T> data;
         public ContainLabel containLabel;
 
         public GameObject instance { get; private set; }
         public bool isInstance => instance != null;
 
-        public bool isValid => data.OperationHandle.IsValid();
+        public bool isValid => data.OperationHandle.IsValid() && data.OperationHandle.Status == AsyncOperationStatus.Succeeded;
+        public bool runtimeKeyIsValid => data.RuntimeKeyIsValid();
+
+        public ContainLabel ContainLabel => containLabel;
 
         public async UniTask<T1> InstantiateAsync<T1>(Transform parent)
         {
             var handle = data.InstantiateAsync(parent);
             await handle.ToUniTask();
-
             instance = handle.Result;
+
             if (typeof(T1) == typeof(GameObject))
-                return (T1)(object)handle.Result;
-            return handle.Result.GetComponent<T1>();
+                return (T1)(object)instance;
+            return instance.GetComponent<T1>();
         }
 
-        public AsyncOperationHandle<GameObject> LoadAsset(Action<AsyncOperationHandle<GameObject>> complete)
-        {
-            var loadHandle = data.LoadAssetAsync<GameObject>();
-            loadHandle.Completed += complete;
-            return loadHandle;
+        public AsyncOperationHandle LoadAssetHandle() 
+        { 
+            if (isValid)
+                return  data.OperationHandle;
+
+            return data.LoadAssetAsync();
         }
 
         public void ReleaseAsset()

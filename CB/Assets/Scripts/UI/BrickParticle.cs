@@ -2,24 +2,10 @@ using Cysharp.Threading.Tasks;
 using System;
 using System.Threading;
 using UnityEngine;
-using UnityEngine.UI;
 
-public class BrickParticle
+public class BrickParticle : BaseParticle
 {
-    private readonly RectTransform _rt;
-    private readonly Image _img;
-
-    private const float Gravity = -400f;
-    private const float LifeTime = 1.2f;
-    private const float FadeStart = 0.6f;  // LifeTime 대비 비율
-
-    public BrickParticle(RectTransform rt, Image img)
-    {
-        _rt = rt;
-        _img = img;
-    }
-
-    public async UniTaskVoid Play(
+    public async override UniTaskVoid Play(
         Vector2 spawnPos,
         Color color,
         Vector2 velocity,
@@ -40,25 +26,26 @@ public class BrickParticle
         Vector2 pos = spawnPos;
         Vector2 vel = velocity;
 
-        while (elapsed < LifeTime)
+        while (elapsed < particleData.LifeTime)
         {
+            if (_rt == null)
+                return;
             float dt = Time.deltaTime;
-            vel.y += Gravity * dt;
+            vel.y += particleData.Gravity * dt;
             pos += vel * dt;
             elapsed += dt;
 
             _rt.anchoredPosition = pos;
             _rt.Rotate(0f, 0f, rotSpeed * dt);
 
-            float lifeRatio = elapsed / LifeTime;
-            if (lifeRatio > FadeStart)
+            float lifeRatio = elapsed / particleData.LifeTime;
+            if (lifeRatio > particleData.FadeStart)
             {
                 Color faded = color;
-                faded.a = 1f - (lifeRatio - FadeStart) / (1f - FadeStart);
+                faded.a = 1f - (lifeRatio - particleData.FadeStart) / (1f - particleData.FadeStart);
                 _img.color = faded;
             }
 
-            // ct 취소 시 즉시 반납
             if (ct.IsCancellationRequested) break;
 
             await UniTask.Yield(PlayerLoopTiming.Update);

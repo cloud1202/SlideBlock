@@ -1,18 +1,21 @@
 using Cysharp.Threading.Tasks;
-using System.Collections.Generic;
+using System.Threading;
 using TMPro;
 using UnityEngine;
 
 public class GameOverUI : BaseUI, IScore
 {
-    [SerializeField] private Transform _highScoreCrown;
+    [SerializeField] private HighScoreObject _highScore;
     [SerializeField] private TextMeshProUGUI _score;
     [SerializeField] private TextMeshProUGUI _combo;
 
+    private CancellationTokenSource _confettiToken = null;
     public override void Init()
     {
-        _highScoreCrown.gameObject.SetActive(false);
+        _highScore.Init();
         base.Init();
+        SetScore(0);
+        SoundManager.Instance.PlayBGM().Forget();
     }
 
     public void SetScores()
@@ -23,15 +26,17 @@ public class GameOverUI : BaseUI, IScore
     {
         if(GameManager.Instance.HighScore < score)
         {
-            PlayerPrefs.SetInt("HighScore", score);
-            _highScoreCrown.gameObject.SetActive(true);
+            SoundManager.Instance.PlaySFX(SoundData.Confetti).Forget();
+            _confettiToken = new CancellationTokenSource();
+            FirebaseManager.Instance.SaveHighScore(SaveFieldType.HighScore_Classic, score);
+            _highScore.Burst(_confettiToken.Token).Forget();
         }
-        _score.text = score.ToString();
+        _score.text = Utility.NumberRegularExpression(score);
     }
 
     public void UpdateCombo(int combo, Vector2 boundCenter)
     {
-        _combo.text = combo.ToString();
+        _combo.text = Utility.NumberRegularExpression(combo);
     }
 
     public void OnClickRetryBtn()
@@ -47,6 +52,9 @@ public class GameOverUI : BaseUI, IScore
     }
     public void OnClickCloseBtn()
     {
+        _confettiToken?.Cancel();
+        _confettiToken?.Dispose();
+        _confettiToken = null;
         gameObject.SetActive(false);
     }
 }

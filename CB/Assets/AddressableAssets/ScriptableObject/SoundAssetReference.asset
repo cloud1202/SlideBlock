@@ -1,0 +1,55 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: da90a1e31a71d094eb1543774798335b, type: 3}
+  m_Name: SoundAssetReference
+  m_EditorClassIdentifier: 
+  assetDatas:
+  - id: 0
+    data:
+      m_AssetGUID: d65d2ad762354a843bcc8c0a63557876
+      m_SubObjectName: 
+      m_SubObjectType: 
+      m_SubObjectGUID: 
+      m_EditorAssetChanged: 0
+    containLabel: 1
+  - id: 1
+    data:
+      m_AssetGUID: 27a1936d0202df34480dd0484354023a
+      m_SubObjectName: 
+      m_SubObjectType: 
+      m_SubObjectGUID: 
+      m_EditorAssetChanged: 0
+    containLabel: 1
+  - id: 100
+    data:
+      m_AssetGUID: 77e80f685a30bb0488b87e59bb201d34
+      m_SubObjectName: 
+      m_SubObjectType: 
+      m_SubObjectGUID: 
+      m_EditorAssetChanged: 0
+    containLabel: 1
+  - id: 101
+    data:
+      m_AssetGUID: 16d0eba79f88f16438ff7a51c6cf72bf
+      m_SubObjectName: 
+      m_SubObjectType: 
+      m_SubObjectGUID: 
+      m_EditorAssetChanged: 0
+    containLabel: 1
+  - id: 102
+    data:
+      m_AssetGUID: 051c26d1b491ed74aa930359569963e1
+      m_SubObjectName: 
+      m_SubObjectType: 
+      m_SubObjectGUID: 
+      m_EditorAssetChanged: 0
+    containLabel: 1

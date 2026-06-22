@@ -1,33 +1,31 @@
 using Cysharp.Threading.Tasks;
-using System;
 using System.Collections.Generic;
+using System.Threading;
 using UnityEngine;
 
-public class ReferenceManager<T, E> : SingletonInstance<T>
+public class ReferenceManager<T> : SingletonInstance<T>
     where T : MonoBehaviour
-    where E : Enum
 {
-    private AssetReferenceBase<E, GameObject> _assetReference;
-    protected Dictionary<E, IAssetResource> _assetMap = new Dictionary<E, IAssetResource>();
+    protected Dictionary<int, IAssetResource> _assetMap = new Dictionary<int, IAssetResource>();
+    protected IEnumerable<IAssetResource> _assetDatas = new List<IAssetResource>();
     public override void Init()
     {
         base.Init();
     }
 
-    async public UniTask LoadAssetReference()
+    async public virtual UniTask LoadAssetReference()
     {
-        _assetReference = await AddressableManager.Instance.LoadResourceData<AssetReferenceBase<E,GameObject>>(nameof(PrefabAssetReference));
         AssetReferenceMapping();
         await PreloadAssets(ContainLabel.Common);
     }
 
-    private void AssetReferenceMapping()
+    protected void AssetReferenceMapping()
     {
-        foreach (var obj in _assetReference.assetDatas)
+        foreach (var obj in _assetDatas)
         {
-            if (!_assetMap.ContainsKey(obj.id))
+            if (!_assetMap.ContainsKey(obj.Index))
             {
-                _assetMap.Add(obj.id, obj);
+                _assetMap.Add(obj.Index, obj);
             }
         }
     }
@@ -36,9 +34,9 @@ public class ReferenceManager<T, E> : SingletonInstance<T>
     {
         List<IAssetResource> assets = new List<IAssetResource>();
 
-        foreach (var obj in _assetReference.assetDatas)
+        foreach (var obj in _assetDatas)
         {
-            if ((obj.containLabel & label) > 0)
+            if ((obj.ContainLabel & label) > 0)
             {
                 assets.Add(obj);
             }
@@ -47,9 +45,18 @@ public class ReferenceManager<T, E> : SingletonInstance<T>
         await AddressableManager.Instance.PreloadAssets(label, assets.ToArray());
     }
 
-    public async UniTask<TI> InstantiateObject<TI>(E data, Transform parent = null, bool isProtected = false)
+    public async UniTask<TI> LoadAsset<TI>(int index, CancellationToken ct = new CancellationToken()) where TI : UnityEngine.Object
     {
-        if (_assetMap.TryGetValue(data, out var obj) == false)
+        if (_assetMap.TryGetValue(index, out var obj) == false)
+        {
+            return default;
+        }
+
+        return await AddressableManager.Instance.Load<TI>(obj, ct);
+    }
+    public async UniTask<TI> InstantiateObject<TI>(int index, Transform parent = null, bool isProtected = false)
+    {
+        if (_assetMap.TryGetValue(index, out var obj) == false)
         {
             return default;
         }

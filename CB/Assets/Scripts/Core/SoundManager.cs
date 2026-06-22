@@ -1,8 +1,11 @@
+using Cysharp.Threading.Tasks;
+using DG.Tweening;
+using System.Threading;
 using UnityEngine;
 using UnityEngine.Events;
 
 [ManagerOrder(6)]
-public class SoundManager : ReferenceManager<SoundManager, SoundData>, IManager
+public class SoundManager : ReferenceManager<SoundManager>, IManager
 {
     private const float DEFAULT_SOUND_VOLUM = 0.5f;
 
@@ -55,16 +58,71 @@ public class SoundManager : ReferenceManager<SoundManager, SoundData>, IManager
         }
     }
 
+    private bool _isBGMOn;
+    public bool IsBGMOn
+    {
+        get { return _isBGMOn; }
+        set
+        {
+            if (_isBGMOn == value)
+                return;
+
+            _isBGMOn = value;
+            _bgmAudio.mute = !value;
+        }
+    }
+
+    private bool _isSFXOn;
+    public bool IsSFXOn
+    {
+        get { return _isSFXOn; }
+        set
+        {
+            if (_isSFXOn == value)
+                return;
+
+            _isSFXOn = value;
+            _sfxAudio.mute = !value;
+        }
+    }
+
+    private bool _isVIBOn;
+    public bool IsVIBOn
+    {
+        get { return _isVIBOn; }
+        set
+        {
+            if (_isVIBOn == value)
+                return;
+
+            _isVIBOn = value;
+        }
+    }
     public override void Init()
     {
         base.Init();
         CreateBGMAudio();
         CreateSFXAudio();
 
-        _updateSoundVolumEvent += UpdateVolum;
-        _updateBGMVolumEvent += UpdateBGMVolum;
-        _updateSFXVolumEvent += UpdateSFXVolum;
+        LoadSaveFieldData().Forget();
+        //_updateSoundVolumEvent += UpdateVolum;
+        //_updateBGMVolumEvent += UpdateBGMVolum;
+        //_updateSFXVolumEvent += UpdateSFXVolum;
         SoundVolumPer = 0.5f;
+    }
+
+    async private UniTask LoadSaveFieldData()
+    {
+        IsBGMOn = await FirebaseManager.Instance.GetField(SaveFieldType.IsBGMOn, 1) > 0 ? true : false;
+        IsSFXOn = await FirebaseManager.Instance.GetField(SaveFieldType.IsSFXOn, 1) > 0 ? true : false;
+        IsVIBOn = await FirebaseManager.Instance.GetField(SaveFieldType.IsVibOn, 1) > 0 ? true : false;
+    }
+
+    async public override UniTask LoadAssetReference()
+    {
+        var assets = await AddressableManager.Instance.LoadResourceData<SoundAssetReference>(nameof(SoundAssetReference));
+        _assetDatas = assets.assetDatas;
+        await base.LoadAssetReference();
     }
 
     private void CreateBGMAudio()
@@ -73,6 +131,7 @@ public class SoundManager : ReferenceManager<SoundManager, SoundData>, IManager
         _bgmAudio = go.AddComponent<AudioSource>();
         _bgmAudio.playOnAwake = false;
         _bgmAudio.loop = true;
+        _bgmAudio.volume = 1.0f;
         go.transform.SetParent(this.transform);
     }
 
@@ -81,6 +140,7 @@ public class SoundManager : ReferenceManager<SoundManager, SoundData>, IManager
         var go = new GameObject("SFX");
         _sfxAudio = go.AddComponent<AudioSource>();
         _sfxAudio.playOnAwake = false;
+        _sfxAudio.volume = 1.0f;
         go.transform.SetParent(this.transform);
     }
 
@@ -100,12 +160,37 @@ public class SoundManager : ReferenceManager<SoundManager, SoundData>, IManager
         _sfxAudio.volume = DEFAULT_SOUND_VOLUM  * volumPer;
     }
 
-    public void PlayBGM(SoundData sound)
+    async public UniTask PlayBGM(SoundData sound = SoundData.None)
     {
+        if(sound == SoundData.None)
+        {
+            _bgmAudio.clip = null;
+        }
+        else
+        {
+            var clip = await LoadAsset<AudioClip>(EnumConverter.Enum32ToInt(sound));
+            await FadeBGM(true);
+            _bgmAudio.clip = clip;
+        }
+        _bgmAudio.Play();
+        FadeBGM(false).Forget();
     }
 
-    public void PlaySFX(SoundData sound)
+    async public UniTask PlaySFX(SoundData sound, CancellationToken ct = new CancellationToken())
     {
+        var clip = await LoadAsset<AudioClip>(EnumConverter.Enum32ToInt(sound), ct);
+
+        _sfxAudio.PlayOneShot(clip);
+    }
+
+    async private UniTask FadeBGM(bool isFadeOut)
+    {
+        if (_bgmAudio.clip == null)
+            return;
+        float endValue = isFadeOut ? 0f : 1f;
+        var tween = DOTween.To(() => _bgmAudio.volume, vol => _bgmAudio.volume = vol, endValue, 0.5f);
+
+        await UniTask.WaitWhile(() => tween.active);
     }
 
     public void SubscribeToSoundHandler(UnityAction<float> subscribeEvent)

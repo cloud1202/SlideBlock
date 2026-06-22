@@ -17,17 +17,9 @@ public struct BoardArea
         this.posX = posX;
 
         if (brick != null)
-            GameObject.DestroyImmediate(brick.gameObject);
+            brick.gameObject.SetActive(false);
 
         this.brick = null;
-    }
-
-    public void Reset()
-    {
-        if (brick == null)
-            return;
-
-        GameObject.DestroyImmediate(brick.gameObject);
     }
 
     public void SetBrick(Brick brick = null)

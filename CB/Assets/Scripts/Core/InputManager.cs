@@ -6,12 +6,24 @@ using static UnityEngine.InputSystem.InputAction;
 public class InputManager : SingletonInstance<InputManager>, IManager
 {
     private PlayerInput _inputHandler;
+
+    public bool UseInputHandler
+    {
+        set
+        {
+            if (value)
+                _inputHandler.Player.Enable();
+            else
+                _inputHandler.Player.Disable();
+        }
+    }
     public override void Init()
     {
         base.Init();
         _inputHandler = new PlayerInput();
-        _inputHandler.Player.Enable();
+        UseInputHandler = true;
     }
+
 
     public void SubscribeToInputHandler(InputType type, 
         Action<CallbackContext> start = null, 

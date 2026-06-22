@@ -3,13 +3,19 @@ using UnityEngine;
 
 
 [ManagerOrder(4)]
-public class PrefabManager : ReferenceManager<PrefabManager, PrefabData>, IManager
+public class PrefabManager : ReferenceManager<PrefabManager>, IManager
 {
     private Canvas _canvas;
 
     public override void Init()
     {
         base.Init();
+    }
+    async public override UniTask LoadAssetReference()
+    {
+        var assets = await AddressableManager.Instance.LoadResourceData<PrefabAssetReference>(nameof(PrefabAssetReference));
+        _assetDatas = assets.assetDatas;
+        await base.LoadAssetReference();
     }
 
     async public UniTask InitLoadObjects()
@@ -19,17 +25,22 @@ public class PrefabManager : ReferenceManager<PrefabManager, PrefabData>, IManag
         _canvas.worldCamera = cam;
     }
 
-    async public UniTask<TI> InstantiateUI<TI>(PrefabData data, Transform parent = null, bool isProtected = false)
+    public async UniTask<TI> InstantiateObject<TI>(PrefabData type, Transform parent = null, bool isProtected = false)
     {
-        if (_assetMap.TryGetValue(data, out var obj) == false)
+        return await InstantiateObject<TI>(EnumConverter.Enum32ToInt(type), parent, isProtected);
+    }
+
+    async public UniTask<TI> InstantiateUI<TI>(PrefabData type, Transform parent = null, bool isProtected = false)
+    {
+        if (_assetMap.TryGetValue(EnumConverter.Enum32ToInt(type), out var obj) == false)
         {
-            Logging($"Not Find AssetReference! {data}");
+            Logging($"Not Find AssetReference! {type}");
             return default;
         }
 
         if (obj.isInstance)
         {
-            Logging($"Current Use Instance! {data}");
+            Logging($"Current Use Instance! {type}");
             return obj.instance.GetComponent<TI>();
         }
 

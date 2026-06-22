@@ -1,6 +1,7 @@
 using Cysharp.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.SocialPlatforms.Impl;
+using static UnityEditor.Profiling.RawFrameDataView;
 
 public class RoundManager : MonoBehaviour, IRound
 {
@@ -25,13 +26,13 @@ public class RoundManager : MonoBehaviour, IRound
         _gameOver = await PrefabManager.Instance.InstantiateUI<IScore>(PrefabData.GameOverUI);
         _board = await PrefabManager.Instance.InstantiateObject<RoundObject>(PrefabData.Board, this.transform);
         _board.SetRoundManager(this);
-        _score.Init();
 
         _timer = Timer.CreateTimer(COMBO_DELAY, ResetCombo);
     }
 
     public void EnterRound()
     {
+        _score.Init();
         _scoreValue = 0;
         _comboValue = 0;
         _maxCombo = 0;
@@ -41,13 +42,15 @@ public class RoundManager : MonoBehaviour, IRound
 
     public void EndRound()
     {
+        _score.Close();
+        _gameOver.Init();
         _gameOver.SetScore(_scoreValue);
         _gameOver.UpdateCombo(_maxCombo);
-        _gameOver.Init();
     }
 
     public void ExitRound()
     {
+        FirebaseManager.Instance.LogEvent("Move Home");
         _score.Close();
         _gameOver.Close();
         Destroy(gameObject);

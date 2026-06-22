@@ -16,6 +16,9 @@ public class InGameUI : BaseUI, IScore
 
     public override void Init()
     {
+        SoundManager.Instance.PlayBGM(SoundData.Ingame).Forget();
+        _scoreObj.ResetToken();
+        _scoreObj.Init();
         InitLoadUI().Forget();
     }
 
@@ -53,9 +56,9 @@ public class InGameUI : BaseUI, IScore
             _vibrationData.InitData();
             _vibrationToken = new CancellationTokenSource();
             Utility.AsyncVibrateObject(_score.transform.parent, _vibrationToken, _vibrationData).Forget();
+            _scoreObj.Burst(_vibrationToken.Token).Forget();
         }
         _vibrationData.UpdateFrequency(comboValue);
-        _scoreObj.Burst(0, _vibrationToken.Token);
         _combo.SetCombo(comboValue, boundCenter).Forget();
     }
 
@@ -69,5 +72,12 @@ public class InGameUI : BaseUI, IScore
     public void OnClickMenuBtn()
     {
         _menuUI.Init();
+    }
+
+    public override void Close()
+    {
+        ResetToken();
+        _scoreObj.ResetToken();
+        base.Close();
     }
 }

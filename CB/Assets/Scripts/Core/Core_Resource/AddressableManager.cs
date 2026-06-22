@@ -1,6 +1,8 @@
 using Cysharp.Threading.Tasks;
 using System;
 using System.Collections.Generic;
+using System.Threading;
+using UnityEditor;
 using UnityEngine;
 using UnityEngine.AddressableAssets;
 using UnityEngine.ResourceManagement.AsyncOperations;
@@ -99,7 +101,7 @@ public class AddressableManager : SingletonInstance<AddressableManager>
         if (_loadHandles.ContainsKey(label) == false)
             _loadHandles.Add(label, new List<AsyncOperationHandle>());
 
-        List<UniTask<GameObject>> handles = new List<UniTask<GameObject>>();
+        List<UniTask> handles = new List<UniTask>();
 
         Logging($"PreLoad Asset : {label}");
         int length = assetResources.Length;
@@ -107,7 +109,8 @@ public class AddressableManager : SingletonInstance<AddressableManager>
         {
             if (assetResources[index].isValid)
                 continue;
-            var loadHandle = assetResources[index].LoadAsset(OnComplete);
+            var loadHandle = assetResources[index].LoadAssetHandle();
+            loadHandle.Completed += OnComplete;
             _loadHandles[label].Add(loadHandle);
             handles.Add(loadHandle.ToUniTask());
         }
@@ -115,7 +118,7 @@ public class AddressableManager : SingletonInstance<AddressableManager>
         await UniTask.WhenAll(handles);
         Logging($"Complete PreLoad Assets");
 
-        void OnComplete(AsyncOperationHandle<GameObject> handle)
+        void OnComplete(AsyncOperationHandle handle)
         {
             if (handle.Status == AsyncOperationStatus.Succeeded && handle.Result != null)
             {
@@ -128,37 +131,33 @@ public class AddressableManager : SingletonInstance<AddressableManager>
         }
     }
 
-    public async UniTask<T> Load<T>(AssetReference assetRef) where T : UnityEngine.Object
+    public async UniTask<T> Load<T>(IAssetResource assetRef, CancellationToken ct = new CancellationToken()) where T : UnityEngine.Object
     {
-        if (assetRef == null || !assetRef.RuntimeKeyIsValid())
+        if (assetRef == null || !assetRef.runtimeKeyIsValid)
         {
             Warning($"AssetReference가 유효하지 않습니다.");
             return null;
         }
 
-        if (assetRef.OperationHandle.IsValid() && assetRef.OperationHandle.IsDone &&
-            assetRef.OperationHandle.Status == AsyncOperationStatus.Succeeded)
+        if (assetRef.isValid)
         {
-            T preloadedResult = assetRef.OperationHandle.Result as T;
-            if (preloadedResult != null)
-            {
-                Logging("LoadPreloadResult");
-                return preloadedResult;
-            }
+            var handle = assetRef.LoadAssetHandle();
+
+            return handle.Result as T;
         }
 
-        AsyncOperationHandle newLoadHandle = assetRef.LoadAssetAsync<T>();
+        var newHandle = assetRef.LoadAssetHandle();
 
-        await newLoadHandle.ToUniTask();
-
-        if (newLoadHandle.Status == AsyncOperationStatus.Succeeded)
+        _loadHandles[assetRef.ContainLabel].Add(newHandle);
+        await newHandle.ToUniTask(cancellationToken : ct);
+        
+        if (newHandle.Status == AsyncOperationStatus.Succeeded)
         {
             Logging("newLoadHandle");
-            T preloadedResult = newLoadHandle.Result as T;
-            return preloadedResult;
+            return newHandle.Result as T;
         }
-
-        Error($"Failed to load '{assetRef.RuntimeKey}': {newLoadHandle.OperationException}");
+        
+        Error($"Failed to load {newHandle.OperationException}");
         return null;
     }
 

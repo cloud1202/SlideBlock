@@ -8,9 +8,9 @@ public class GameManager : SingletonInstance<GameManager>, IManager
     private IBaseUI _lobbyUI;
     async public UniTask Bootstrap()
     {
-        HighScore = PlayerPrefs.GetInt("HighScore",0);
         await AddressableManager.Instance.SetAddressable();
         await PrefabManager.Instance.LoadAssetReference();
+        await SoundManager.Instance.LoadAssetReference();
         await PrefabManager.Instance.InitLoadObjects();
         _lobbyUI = await PrefabManager.Instance.InstantiateUI<IBaseUI>(PrefabData.LobbyUI);
 
@@ -25,6 +25,7 @@ public class GameManager : SingletonInstance<GameManager>, IManager
             await _roundManager.Init();
         }
 
+        HighScore = await FirebaseManager.Instance.GetField(SaveFieldType.HighScore_Classic, 0);
         _lobbyUI.Close();
         _roundManager.EnterRound();
     }

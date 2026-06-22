@@ -22,6 +22,12 @@ public static class Utility
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static float RandomFloat(float max = float.MaxValue, float min = 0)
+    {
+        return UnityEngine.Random.Range(min, max);
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static int CalcScore(int score, int combo)
     {
         return Mathf.RoundToInt(score * (combo + 1) * 0.5f);
@@ -52,6 +58,8 @@ public static class Utility
         // 콤보 지속 구간
         while (!tokenSource.IsCancellationRequested)
         {
+            if (transform == null)
+                return;
             elapsed += Time.deltaTime;
             float offset = data.amplitude * Mathf.Sin(2f * Mathf.PI * data.frequency * elapsed);
             transform.position = origin + new Vector3(offset, 0f, 0f);
