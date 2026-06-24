@@ -10,12 +10,16 @@ public struct ParticleData
     public float Gravity;
     public float LifeTime;
     public float FadeStart;  // LifeTime 대비 비율
+    public float MinSize;
+    public float MaxSize;
 
-    public ParticleData(float gravity, float lifeTime, float fadeStart)
+    public ParticleData(float gravity, float lifeTime, float fadeStart, float minSize, float maxSize)
     {
         Gravity = gravity;
         LifeTime = lifeTime;
         FadeStart = fadeStart;
+        MinSize = minSize;
+        MaxSize = maxSize;
     }
     //public ParticleData()
     //{
@@ -38,15 +42,5 @@ public class BaseParticle
         _rt = rt;
         _img = img;
         particleData = data;
-    }
-
-    public async virtual UniTaskVoid Play(
-        Vector2 spawnPos,
-        Color color,
-        Vector2 velocity,
-        CancellationToken ct,
-        Action<BrickParticle> onComplete)
-    {
-        await UniTask.Yield(PlayerLoopTiming.Update);
     }
 }

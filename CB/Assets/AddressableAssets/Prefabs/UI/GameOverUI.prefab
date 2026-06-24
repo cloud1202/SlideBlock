@@ -640,6 +640,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 68338fda85e0b624f91c08c58ed8d539, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  _particle: {fileID: 21300000, guid: fab55a0e78a600842a905f96f70ec84d, type: 3}
   _poolSize: 128
   _particleSize: {x: 25, y: 25}
   Gravity: -70

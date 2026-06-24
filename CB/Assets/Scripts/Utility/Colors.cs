@@ -17,12 +17,12 @@ public static class Colors
         new Color[]
         {
             new Color(1.00f, 0.00f, 0.00f), // FF0000FF
-            new Color(1.00f, 0.84f, 0.00f), // FFD600FF
-            new Color(0.32f, 1.00f, 0.00f), // 52FF00FF
-            new Color(0.00f, 1.00f, 0.52f), // 00FF85FF
-            new Color(0.00f, 0.64f, 1.00f), // 00A3FFFF
-            new Color(0.20f, 0.00f, 1.00f), // 3300FFFF
-            new Color(1.00f, 0.00f, 0.96f), // FF00F5FF
+            new Color(1.00f, 0.39f, 0.00f), // FF6400FF
+            new Color(1.00f, 1.00f, 0.00f), // FFFF00FF
+            new Color(0.00f, 0.71f, 0.00f), // 00B400FF
+            new Color(0.40f, 0.00f, 1.00f), // 6600FFFF
+            new Color(0.29f, 0.00f, 0.51f), // 4B0082FF
+            new Color(0.50f, 0.00f, 0.46f), // 800076FF
         },
     };
 }
