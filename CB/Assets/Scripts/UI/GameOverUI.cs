@@ -26,12 +26,20 @@ public class GameOverUI : BaseUI, IScore
     {
         if(GameManager.Instance.HighScore < score)
         {
-            SoundManager.Instance.PlaySFX(SoundData.Confetti).Forget();
-            _confettiToken = new CancellationTokenSource();
-            FirebaseManager.Instance.SaveHighScore(SaveFieldType.HighScore_Classic, score);
-            _highScore.Burst(_confettiToken.Token).Forget();
+            UpdateHighScore(score).Forget();
         }
         _score.text = Utility.NumberRegularExpression(score);
+    }
+
+    async private UniTask UpdateHighScore(int score)
+    {
+        SoundManager.Instance.PlaySFX(SoundData.Confetti).Forget();
+        _confettiToken = new CancellationTokenSource();
+        FirebaseManager.Instance.SaveHighScore(SaveFieldType.HighScore_Classic, score);
+        _highScore.Burst(_confettiToken.Token).Forget();
+
+        await UniTask.WaitForSeconds(2f);
+        AdmobManager.Instance.CreateInterstitial();
     }
 
     public void UpdateCombo(int combo, Vector2 boundCenter)

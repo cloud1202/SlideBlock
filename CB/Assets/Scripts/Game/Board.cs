@@ -59,6 +59,16 @@ public class Board : RoundObject
     public override void Init()
     {
         ResetToken();
+        ResetBoard();
+        _changeDirectionToken = new CancellationTokenSource();
+        InitBrick().Forget();
+        _boardDirection = BoardDirection.None;
+        _isDrag = false;
+        _isSlide = false;
+    }
+
+    private void ResetBoard()
+    {
         for (int i = 0; i < BOARD_SIZE; i++)
             for (int j = 0; j < BOARD_SIZE; j++)
             {
@@ -67,11 +77,6 @@ public class Board : RoundObject
                     _bricks.Enqueue(brick);
                 _boardAreas[i, j].Init(i, j, POS_ARR[i], POS_ARR[j]);
             }
-        _changeDirectionToken = new CancellationTokenSource();
-        InitBrick().Forget();
-        _boardDirection = BoardDirection.None;
-        _isDrag = false;
-        _isSlide = false;
     }
 
     public void ResetToken()
@@ -179,6 +184,7 @@ public class Board : RoundObject
         if (isCompleteSpawn == false)
         {
             ResetToken();
+            ResetBoard();
             _roundManager.EndRound();
             return;
         }

@@ -17,6 +17,13 @@ public class VibrateData
         duration = INIT_DUR;
     }
 
+    public VibrateData(float amplitude, float frequency, float duration)
+    {
+        this.amplitude = amplitude;
+        this.frequency = frequency;
+        this.duration = duration;
+    }
+
     public void UpdateFrequency(int variable)
     {
         variable = Mathf.Clamp(variable, 0, BENCHMARK_VARIABLE);

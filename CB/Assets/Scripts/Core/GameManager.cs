@@ -8,11 +8,12 @@ public class GameManager : SingletonInstance<GameManager>, IManager
     private IBaseUI _lobbyUI;
     async public UniTask Bootstrap()
     {
+        ResolutionScreen.InitResolution();
         await AddressableManager.Instance.SetAddressable();
         await PrefabManager.Instance.LoadAssetReference();
         await SoundManager.Instance.LoadAssetReference();
         await PrefabManager.Instance.InitLoadObjects();
-        _lobbyUI = await PrefabManager.Instance.InstantiateUI<IBaseUI>(PrefabData.LobbyUI);
+        _lobbyUI = await PrefabManager.Instance.InstantiateStaticUI<IBaseUI>(PrefabData.LobbyUI);
 
         _lobbyUI.Init();
     }

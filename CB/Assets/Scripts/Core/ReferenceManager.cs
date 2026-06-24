@@ -41,7 +41,6 @@ public class ReferenceManager<T> : SingletonInstance<T>
                 assets.Add(obj);
             }
         }
-        Debug.Log($"{assets.Count}");
         await AddressableManager.Instance.PreloadAssets(label, assets.ToArray());
     }
 
@@ -54,7 +53,7 @@ public class ReferenceManager<T> : SingletonInstance<T>
 
         return await AddressableManager.Instance.Load<TI>(obj, ct);
     }
-    public async UniTask<TI> InstantiateObject<TI>(int index, Transform parent = null, bool isProtected = false)
+    protected async UniTask<TI> InstantiateObject<TI>(int index, Transform parent = null, bool isProtected = false)
     {
         if (_assetMap.TryGetValue(index, out var obj) == false)
         {

@@ -10,7 +10,6 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.SocialPlatforms.Impl;
-using static Codice.Client.Commands.WkTree.WorkspaceTreeNode;
 
 /// <summary>
 /// Firebase 전 기능(Auth, Firestore, Analytics, Crashlytics, Messaging)을 한 곳에서 관리하는 매니저.

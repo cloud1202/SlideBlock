@@ -5,11 +5,9 @@ public class MenuUI : BaseUI
 {
     [SerializeField] private SlideToggle _bgmToggle;
     [SerializeField] private SlideToggle _sfxToggle;
-    [SerializeField] private SlideToggle _vibToggle;
 
     private bool _initBGM;
     private bool _initSFX;
-    private bool _initVIB;
 
     private bool _isDirty;
     public override void Init()
@@ -18,15 +16,12 @@ public class MenuUI : BaseUI
 
         _initBGM = SoundManager.Instance.IsBGMOn;
         _initSFX = SoundManager.Instance.IsSFXOn;
-        _initVIB = SoundManager.Instance.IsVIBOn;
 
         _bgmToggle.SetValueWithoutNotify(_initBGM);
         _sfxToggle.SetValueWithoutNotify(_initSFX);
-        _vibToggle.SetValueWithoutNotify(_initVIB);
 
         _bgmToggle.OnValueChanged += OnBGMToggleChanged;
         _sfxToggle.OnValueChanged += OnSFXToggleChanged;
-        _vibToggle.OnValueChanged += OnVIBToggleChanged;
 
         base.Init();
     }
@@ -35,7 +30,6 @@ public class MenuUI : BaseUI
     {
         _isDirty |= _initBGM != _bgmToggle.IsOn;
         _isDirty |= _initSFX != _sfxToggle.IsOn;
-        _isDirty |= _initVIB != _vibToggle.IsOn;
 
         if (!_isDirty)
             return;
@@ -48,7 +42,6 @@ public class MenuUI : BaseUI
             new int[]{
                 _bgmToggle.IsOn.GetHashCode(),
                 _sfxToggle.IsOn.GetHashCode(),
-                _vibToggle.IsOn.GetHashCode(),
             });
         PlayerPrefs.Save();
     }
@@ -56,7 +49,6 @@ public class MenuUI : BaseUI
     {
         _bgmToggle.OnValueChanged -= OnBGMToggleChanged;
         _sfxToggle.OnValueChanged -= OnSFXToggleChanged;
-        _vibToggle.OnValueChanged -= OnVIBToggleChanged;
     }
 
     private void OnBGMToggleChanged(bool value)
@@ -67,12 +59,6 @@ public class MenuUI : BaseUI
     private void OnSFXToggleChanged(bool value)
     {
         SoundManager.Instance.IsSFXOn = value;
-        PlayerPrefs.Save();
-    }
-
-    private void OnVIBToggleChanged(bool value)
-    {
-        SoundManager.Instance.IsVIBOn = value;
         PlayerPrefs.Save();
     }
 

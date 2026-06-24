@@ -86,18 +86,6 @@ public class SoundManager : ReferenceManager<SoundManager>, IManager
         }
     }
 
-    private bool _isVIBOn;
-    public bool IsVIBOn
-    {
-        get { return _isVIBOn; }
-        set
-        {
-            if (_isVIBOn == value)
-                return;
-
-            _isVIBOn = value;
-        }
-    }
     public override void Init()
     {
         base.Init();
@@ -115,7 +103,6 @@ public class SoundManager : ReferenceManager<SoundManager>, IManager
     {
         IsBGMOn = await FirebaseManager.Instance.GetField(SaveFieldType.IsBGMOn, 1) > 0 ? true : false;
         IsSFXOn = await FirebaseManager.Instance.GetField(SaveFieldType.IsSFXOn, 1) > 0 ? true : false;
-        IsVIBOn = await FirebaseManager.Instance.GetField(SaveFieldType.IsVibOn, 1) > 0 ? true : false;
     }
 
     async public override UniTask LoadAssetReference()

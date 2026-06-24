@@ -47,6 +47,28 @@ public static class Utility
 
         await tween.AsyncWaitForKill();
     }
+    public static async UniTask AsyncDurationVibrateObject(Transform transform, CancellationTokenSource tokenSource, VibrateData data = null)
+    {
+        if (data == null)
+            data = new VibrateData(0.08f, 5.0f, 0.2f);
+
+        data.UpdateFrequency(100);
+        float elapsed = 0f;
+        Vector3 origin = new Vector3(0f, transform.position.y, transform.position.z);
+
+        while (elapsed < data.duration)
+        {
+            elapsed += Time.deltaTime;
+            float t = elapsed / data.duration;
+            float envelope = 1f - t;
+            float offset = data.amplitude * envelope
+                           * Mathf.Sin(2f * Mathf.PI * data.frequency * elapsed);
+            transform.position = new Vector3(offset, offset, origin.z);
+            await UniTask.Yield(PlayerLoopTiming.Update, cancellationToken: tokenSource.Token).SuppressCancellationThrow(); 
+        }
+
+        transform.position = origin;
+    }
 
     public static async UniTask AsyncVibrateObject(Transform transform, CancellationTokenSource tokenSource, VibrateData data = null)
     {
@@ -62,7 +84,7 @@ public static class Utility
                 return;
             elapsed += Time.deltaTime;
             float offset = data.amplitude * Mathf.Sin(2f * Mathf.PI * data.frequency * elapsed);
-            transform.position = origin + new Vector3(offset, 0f, 0f);
+            transform.position = new Vector3(offset, origin.y, 0f);
             await UniTask.Yield(tokenSource.Token).SuppressCancellationThrow();
         }
 
@@ -79,7 +101,7 @@ public static class Utility
             float envelope = 1f - t;
             float offset = data.amplitude * envelope
                            * Mathf.Sin(2f * Mathf.PI * data.frequency * (elapsed + decayElapsed));
-            transform.position = origin + new Vector3(offset, 0f, 0f);
+            transform.position =new Vector3(offset, origin.y, 0f);
             await UniTask.Yield(PlayerLoopTiming.Update);  // 감쇠 구간은 새 token 없이
         }
 

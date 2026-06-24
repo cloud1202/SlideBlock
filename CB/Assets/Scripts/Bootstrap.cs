@@ -39,10 +39,10 @@ public class Bootstrap : MonoBehaviour
             }
             catch (ReflectionTypeLoadException ex)
             {
-                Debug.LogError($"Error loading types from assembly {assembly.GetName().Name}: {ex.Message}");
+                LLogger.Log($"Error loading types from assembly {assembly.GetName().Name}: {ex.Message}", level: LLogger.LogLevel.Error);
                 foreach (Exception loaderEx in ex.LoaderExceptions)
                 {
-                    Debug.LogError($"Loader Exception: {loaderEx.Message}");
+                    LLogger.Log($"Loader Exception: {loaderEx.Message}", level: LLogger.LogLevel.Error);
                 }
             }
         }
@@ -52,7 +52,7 @@ public class Bootstrap : MonoBehaviour
         foreach (var item in sortedManagerTypes)
         {
             Type type = item.Type;
-            Debug.Log($"[{item.Order}] Created instance of: {type.Name}");
+            LLogger.Log($"[{item.Order}] Created instance of: {type.Name}");
 
             GameObject go = new GameObject();
             go.name = $"{type.Name}(Singleton)";

@@ -1,7 +1,5 @@
 using Cysharp.Threading.Tasks;
 using UnityEngine;
-using UnityEngine.SocialPlatforms.Impl;
-using static UnityEditor.Profiling.RawFrameDataView;
 
 public class RoundManager : MonoBehaviour, IRound
 {
@@ -22,8 +20,8 @@ public class RoundManager : MonoBehaviour, IRound
 
     async private UniTask LoadRoundObjects()
     {
-        _score = await PrefabManager.Instance.InstantiateUI<IScore>(PrefabData.InGameUI);
-        _gameOver = await PrefabManager.Instance.InstantiateUI<IScore>(PrefabData.GameOverUI);
+        _score = await PrefabManager.Instance.InstantiateStaticUI<IScore>(PrefabData.InGameUI);
+        _gameOver = await PrefabManager.Instance.InstantiateDynamicUI<IScore>(PrefabData.GameOverUI);
         _board = await PrefabManager.Instance.InstantiateObject<RoundObject>(PrefabData.Board, this.transform);
         _board.SetRoundManager(this);
 
@@ -32,11 +30,10 @@ public class RoundManager : MonoBehaviour, IRound
 
     public void EnterRound()
     {
-        _score.Init();
         _scoreValue = 0;
         _comboValue = 0;
         _maxCombo = 0;
-        _score.SetScores();
+        _score.Init();
         _board.Init();
     }
 
@@ -59,7 +56,6 @@ public class RoundManager : MonoBehaviour, IRound
     public void DestroyMatchBricks(int addScore, Vector2 boundCenter)
     {
         UpdateCombo(addScore > 0, boundCenter);
-        LLogger.Log($"Combo :: {_comboValue}, Score :: {addScore}");
 
         _scoreValue += Utility.CalcScore(addScore, _comboValue);
         _score.SetScore(_scoreValue);
@@ -70,6 +66,7 @@ public class RoundManager : MonoBehaviour, IRound
         if (isCombo == false)
             return;
 
+        Utility.AsyncDurationVibrateObject(PrefabManager.Instance.MainCamera.transform, new System.Threading.CancellationTokenSource()).Forget();
         _comboValue++;
         _score.UpdateCombo(_comboValue, boundCenter);
         _timer.Start();

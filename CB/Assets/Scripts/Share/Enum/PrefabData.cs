@@ -6,9 +6,11 @@ public enum PrefabData
     RoundManager,
     MainCamera,
 
-    MainCanvas = 100,
+    StaticCanvas = 100,
     LobbyUI,
     InGameUI,
     MenuUI,
     GameOverUI,
+    DynamicCanvas,
+    IngameScoreUI,
 }

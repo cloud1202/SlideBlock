@@ -5,7 +5,11 @@ using UnityEngine;
 [ManagerOrder(4)]
 public class PrefabManager : ReferenceManager<PrefabManager>, IManager
 {
-    private Canvas _canvas;
+    private ISafeAreaFitter _staticCanvas;
+    private ISafeAreaFitter _dynamicCanvas;
+    private Camera _mainCamera;
+    public RectTransform MainCanvas => _staticCanvas.MyRT;
+    public Camera MainCamera => _mainCamera;
 
     public override void Init()
     {
@@ -20,9 +24,13 @@ public class PrefabManager : ReferenceManager<PrefabManager>, IManager
 
     async public UniTask InitLoadObjects()
     {
-        var cam = await InstantiateObject<Camera>(PrefabData.MainCamera, GameManager.Instance.transform, true);
-        _canvas = await InstantiateObject<Canvas>(PrefabData.MainCanvas, this.transform, true);
-        _canvas.worldCamera = cam;
+        _mainCamera = await InstantiateObject<Camera>(PrefabData.MainCamera, GameManager.Instance.transform, true);
+        _staticCanvas = await InstantiateObject<ISafeAreaFitter>(PrefabData.StaticCanvas, this.transform, true);
+        _dynamicCanvas = await InstantiateObject<ISafeAreaFitter>(PrefabData.DynamicCanvas, this.transform, true);
+        _staticCanvas.InitSafeArea();
+        _dynamicCanvas.InitSafeArea();
+        _staticCanvas.MyCanvas.worldCamera = _mainCamera;
+        _dynamicCanvas.MyCanvas.worldCamera = _mainCamera;
     }
 
     public async UniTask<TI> InstantiateObject<TI>(PrefabData type, Transform parent = null, bool isProtected = false)
@@ -30,7 +38,23 @@ public class PrefabManager : ReferenceManager<PrefabManager>, IManager
         return await InstantiateObject<TI>(EnumConverter.Enum32ToInt(type), parent, isProtected);
     }
 
-    async public UniTask<TI> InstantiateUI<TI>(PrefabData type, Transform parent = null, bool isProtected = false)
+    async public UniTask<TI> InstantiateDynamicUI<TI>(PrefabData type, Transform parent = null, bool isProtected = false)
+    {
+        if (parent == null)
+            parent = _dynamicCanvas.Root;
+
+        return await InstantiateUI<TI>(type, parent, isProtected);
+    }
+
+    async public UniTask<TI> InstantiateStaticUI<TI>(PrefabData type, Transform parent = null, bool isProtected = false)
+    {
+        if (parent == null)
+            parent = _staticCanvas.Root;
+
+        return await InstantiateUI<TI>(type, parent, isProtected);
+    }
+
+    async private UniTask<TI> InstantiateUI<TI>(PrefabData type, Transform parent, bool isProtected)
     {
         if (_assetMap.TryGetValue(EnumConverter.Enum32ToInt(type), out var obj) == false)
         {
@@ -43,9 +67,6 @@ public class PrefabManager : ReferenceManager<PrefabManager>, IManager
             Logging($"Current Use Instance! {type}");
             return obj.instance.GetComponent<TI>();
         }
-
-        if (parent == null)
-            parent = _canvas.transform;
 
         return await AddressableManager.Instance.Instantiate<TI>(obj, parent, isProtected);
     }

@@ -32,24 +32,6 @@ TextureImporter:
   - first:
       213: -8503305437844106070
     second: Logo_9
-  - first:
-      213: 9156548432191564253
-    second: Logo_10
-  - first:
-      213: -1306304639851798359
-    second: Logo_11
-  - first:
-      213: -1528687246299850986
-    second: Logo_12
-  - first:
-      213: -1453834278069125553
-    second: Logo_13
-  - first:
-      213: -8074770578077153683
-    second: Logo_14
-  - first:
-      213: -6159489392364382447
-    second: Logo_15
   externalObjects: {}
   serializedVersion: 13
   mipmaps:
@@ -85,9 +67,9 @@ TextureImporter:
     filterMode: 0
     aniso: 1
     mipBias: 0
-    wrapU: 1
-    wrapV: 1
-    wrapW: 1
+    wrapU: 0
+    wrapV: 0
+    wrapW: 0
   nPOTScale: 0
   lightmap: 0
   compressionQuality: 50
@@ -187,10 +169,10 @@ TextureImporter:
       name: Logo_0
       rect:
         serializedVersion: 2
-        x: 24
-        y: 86
-        width: 54
-        height: 110
+        x: 17
+        y: 65
+        width: 53
+        height: 49
       alignment: 0
       pivot: {x: 0, y: 0}
       border: {x: 0, y: 0, z: 0, w: 0}
@@ -209,10 +191,10 @@ TextureImporter:
       name: Logo_1
       rect:
         serializedVersion: 2
-        x: 75
-        y: 155
-        width: 51
-        height: 56
+        x: 71
+        y: 65
+        width: 45
+        height: 49
       alignment: 0
       pivot: {x: 0, y: 0}
       border: {x: 0, y: 0, z: 0, w: 0}
@@ -231,10 +213,10 @@ TextureImporter:
       name: Logo_2
       rect:
         serializedVersion: 2
-        x: 111
-        y: 155
-        width: 56
-        height: 51
+        x: 117
+        y: 65
+        width: 22
+        height: 49
       alignment: 0
       pivot: {x: 0, y: 0}
       border: {x: 0, y: 0, z: 0, w: 0}
@@ -253,10 +235,10 @@ TextureImporter:
       name: Logo_3
       rect:
         serializedVersion: 2
-        x: 150
-        y: 194
-        width: 33
-        height: 35
+        x: 140
+        y: 65
+        width: 50
+        height: 49
       alignment: 0
       pivot: {x: 0, y: 0}
       border: {x: 0, y: 0, z: 0, w: 0}
@@ -275,10 +257,10 @@ TextureImporter:
       name: Logo_4
       rect:
         serializedVersion: 2
-        x: 160
-        y: 124
-        width: 72
-        height: 85
+        x: 191
+        y: 65
+        width: 47
+        height: 49
       alignment: 0
       pivot: {x: 0, y: 0}
       border: {x: 0, y: 0, z: 0, w: 0}
@@ -297,10 +279,10 @@ TextureImporter:
       name: Logo_5
       rect:
         serializedVersion: 2
-        x: 196
-        y: 181
-        width: 35
-        height: 43
+        x: 17
+        y: 11
+        width: 45
+        height: 49
       alignment: 0
       pivot: {x: 0, y: 0}
       border: {x: 0, y: 0, z: 0, w: 0}
@@ -319,10 +301,10 @@ TextureImporter:
       name: Logo_6
       rect:
         serializedVersion: 2
-        x: 76
-        y: 96
+        x: 63
+        y: 11
         width: 38
-        height: 54
+        height: 49
       alignment: 0
       pivot: {x: 0, y: 0}
       border: {x: 0, y: 0, z: 0, w: 0}
@@ -341,10 +323,10 @@ TextureImporter:
       name: Logo_7
       rect:
         serializedVersion: 2
-        x: 111
-        y: 145
-        width: 8
-        height: 7
+        x: 101
+        y: 11
+        width: 46
+        height: 49
       alignment: 0
       pivot: {x: 0, y: 0}
       border: {x: 0, y: 0, z: 0, w: 0}
@@ -363,10 +345,10 @@ TextureImporter:
       name: Logo_8
       rect:
         serializedVersion: 2
-        x: 119
-        y: 107
-        width: 13
-        height: 50
+        x: 147
+        y: 11
+        width: 46
+        height: 49
       alignment: 0
       pivot: {x: 0, y: 0}
       border: {x: 0, y: 0, z: 0, w: 0}
@@ -385,10 +367,10 @@ TextureImporter:
       name: Logo_9
       rect:
         serializedVersion: 2
-        x: 137
-        y: 112
-        width: 43
-        height: 53
+        x: 193
+        y: 11
+        width: 45
+        height: 49
       alignment: 0
       pivot: {x: 0, y: 0}
       border: {x: 0, y: 0, z: 0, w: 0}
@@ -399,138 +381,6 @@ TextureImporter:
       bones: []
       spriteID: aa497a8b1c03ef980800000000000000
       internalID: -8503305437844106070
-      vertices: []
-      indices: 
-      edges: []
-      weights: []
-    - serializedVersion: 2
-      name: Logo_10
-      rect:
-        serializedVersion: 2
-        x: 27
-        y: 30
-        width: 40
-        height: 56
-      alignment: 0
-      pivot: {x: 0, y: 0}
-      border: {x: 0, y: 0, z: 0, w: 0}
-      customData: 
-      outline: []
-      physicsShape: []
-      tessellationDetail: -1
-      bones: []
-      spriteID: dd9207d1948921f70800000000000000
-      internalID: 9156548432191564253
-      vertices: []
-      indices: 
-      edges: []
-      weights: []
-    - serializedVersion: 2
-      name: Logo_11
-      rect:
-        serializedVersion: 2
-        x: 73
-        y: 42
-        width: 35
-        height: 49
-      alignment: 0
-      pivot: {x: 0, y: 0}
-      border: {x: 0, y: 0, z: 0, w: 0}
-      customData: 
-      outline: []
-      physicsShape: []
-      tessellationDetail: -1
-      bones: []
-      spriteID: 9a06035e9d21fdde0800000000000000
-      internalID: -1306304639851798359
-      vertices: []
-      indices: 
-      edges: []
-      weights: []
-    - serializedVersion: 2
-      name: Logo_12
-      rect:
-        serializedVersion: 2
-        x: 109
-        y: 32
-        width: 38
-        height: 69
-      alignment: 0
-      pivot: {x: 0, y: 0}
-      border: {x: 0, y: 0, z: 0, w: 0}
-      customData: 
-      outline: []
-      physicsShape: []
-      tessellationDetail: -1
-      bones: []
-      spriteID: 61790af7c0309cae0800000000000000
-      internalID: -1528687246299850986
-      vertices: []
-      indices: 
-      edges: []
-      weights: []
-    - serializedVersion: 2
-      name: Logo_13
-      rect:
-        serializedVersion: 2
-        x: 150
-        y: 63
-        width: 38
-        height: 53
-      alignment: 0
-      pivot: {x: 0, y: 0}
-      border: {x: 0, y: 0, z: 0, w: 0}
-      customData: 
-      outline: []
-      physicsShape: []
-      tessellationDetail: -1
-      bones: []
-      spriteID: f4e37654d61f2dbe0800000000000000
-      internalID: -1453834278069125553
-      vertices: []
-      indices: 
-      edges: []
-      weights: []
-    - serializedVersion: 2
-      name: Logo_14
-      rect:
-        serializedVersion: 2
-        x: 193
-        y: 71
-        width: 38
-        height: 56
-      alignment: 0
-      pivot: {x: 0, y: 0}
-      border: {x: 0, y: 0, z: 0, w: 0}
-      customData: 
-      outline: []
-      physicsShape: []
-      tessellationDetail: -1
-      bones: []
-      spriteID: d668fe2f0f6a0ff80800000000000000
-      internalID: -8074770578077153683
-      vertices: []
-      indices: 
-      edges: []
-      weights: []
-    - serializedVersion: 2
-      name: Logo_15
-      rect:
-        serializedVersion: 2
-        x: 106
-        y: 37
-        width: 8
-        height: 8
-      alignment: 0
-      pivot: {x: 0, y: 0}
-      border: {x: 0, y: 0, z: 0, w: 0}
-      customData: 
-      outline: []
-      physicsShape: []
-      tessellationDetail: -1
-      bones: []
-      spriteID: 11795523809158aa0800000000000000
-      internalID: -6159489392364382447
       vertices: []
       indices: 
       edges: []
@@ -551,12 +401,6 @@ TextureImporter:
     nameFileIdTable:
       Logo_0: 1404028623067837608
       Logo_1: 6795467416601567747
-      Logo_10: 9156548432191564253
-      Logo_11: -1306304639851798359
-      Logo_12: -1528687246299850986
-      Logo_13: -1453834278069125553
-      Logo_14: -8074770578077153683
-      Logo_15: -6159489392364382447
       Logo_2: 6875538535012287733
       Logo_3: 2381070441135384947
       Logo_4: -3774021269495190454
