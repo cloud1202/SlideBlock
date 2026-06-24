@@ -6,7 +6,7 @@ public enum InputType
     Player_Touch,
     Player_Point,
 
-    Game_Retry,
+    Game_Exit,
     // UI
     UI = 100,
 }

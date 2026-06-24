@@ -39,8 +39,8 @@ public class InputManager : SingletonInstance<InputManager>, IManager
             case InputType.Player_Point:
                 input = _inputHandler.Player.Point;
                 break;
-            case InputType.Game_Retry:
-                input = _inputHandler.Player.Retry;
+            case InputType.Game_Exit:
+                input = _inputHandler.Player.Exit;
                 break;
             default:
                 return;
@@ -73,8 +73,8 @@ public class InputManager : SingletonInstance<InputManager>, IManager
             case InputType.Player_Point:
                 input = _inputHandler.Player.Point;
                 break;
-            case InputType.Game_Retry:
-                input = _inputHandler.Player.Retry;
+            case InputType.Game_Exit:
+                input = _inputHandler.Player.Exit;
                 break;
             default:
                 return;

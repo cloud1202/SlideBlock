@@ -13,4 +13,6 @@ public enum PrefabData
     GameOverUI,
     DynamicCanvas,
     IngameScoreUI,
+    LegalUI,
+    PopupQuestionUI,
 }

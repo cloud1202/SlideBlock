@@ -24,7 +24,7 @@
                     "initialStateCheck": true
                 },
                 {
-                    "name": "Retry",
+                    "name": "Exit",
                     "type": "Button",
                     "id": "bdf65e6c-a80c-446a-bff2-93c8e3a76728",
                     "expectedControlType": "",
@@ -84,8 +84,8 @@
                     "path": "<Keyboard>/escape",
                     "interactions": "",
                     "processors": "",
-                    "groups": ";Keyboard&Mouse",
-                    "action": "Retry",
+                    "groups": ";Keyboard&Mouse;Touch",
+                    "action": "Exit",
                     "isComposite": false,
                     "isPartOfComposite": false
                 }

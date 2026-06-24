@@ -1,11 +1,14 @@
 using Cysharp.Threading.Tasks;
+using System.Threading;
 using UnityEngine;
+using UnityEngine.InputSystem;
 
 public class GameManager : SingletonInstance<GameManager>, IManager
 {
     public int HighScore { get; private set; }
     private IRound _roundManager;
     private IBaseUI _lobbyUI;
+
     async public UniTask Bootstrap()
     {
         ResolutionScreen.InitResolution();
@@ -16,6 +19,8 @@ public class GameManager : SingletonInstance<GameManager>, IManager
         _lobbyUI = await PrefabManager.Instance.InstantiateStaticUI<IBaseUI>(PrefabData.LobbyUI);
 
         _lobbyUI.Init();
+
+        InputManager.Instance.SubscribeToInputHandler(InputType.Game_Exit, OnClickExit);
     }
 
     async public UniTask StartRound()
@@ -41,7 +46,17 @@ public class GameManager : SingletonInstance<GameManager>, IManager
         _lobbyUI.Init();
     }
 
-    public void ScoreApply(int score)
+    private void OnClickExit(InputAction.CallbackContext callback)
     {
+        ShowExitToast().Forget();
     }
+
+    async private UniTask ShowExitToast()
+    {
+        var popup = await PrefabManager.Instance.InstantiateDynamicUI<IPopupQuestion>(PrefabData.PopupQuestionUI);
+
+        popup.Init(() => Application.Quit());
+        
+    }
+
 }

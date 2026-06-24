@@ -6,7 +6,7 @@ public enum BrickType
     Green,
     Blue,
     Navy,
+    MAX,
     Violet,
 
-    MAX,
 }

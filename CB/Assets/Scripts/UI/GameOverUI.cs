@@ -46,7 +46,6 @@ public class GameOverUI : BaseUI, IScore
     {
         _combo.text = Utility.NumberRegularExpression(combo);
     }
-
     public void OnClickRetryBtn()
     {
         GameManager.Instance.StartRound().Forget();

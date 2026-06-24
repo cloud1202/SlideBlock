@@ -1,19 +1,30 @@
 using Cysharp.Threading.Tasks;
+using TMPro;
 using UnityEngine;
 
 public class GameLobbyUI : BaseUI
 {
     [SerializeField] RectTransform _logo;
     [SerializeField] RectTransform _btnGroup;
-
+    [SerializeField] TextMeshProUGUI _version;
+    
     private float _initLogoRatio;
     private float _initBtnGroupRatio;
+
+    private IBaseUI _legalUI;
     public override void Init()
     {
         SoundManager.Instance.PlayBGM(SoundData.Lobby).Forget();
-        base.Init();
+        InitLoadUI().Forget();
     }
 
+    async private UniTask InitLoadUI()
+    {
+        if (_legalUI == null)
+            _legalUI = await PrefabManager.Instance.InstantiateDynamicUI<IBaseUI>(PrefabData.LegalUI);
+
+        base.Init();
+    }
     private void Awake()
     {
         _initLogoRatio = _logo.anchoredPosition.y / ResolutionScreen.REF_HEIGHT;
@@ -25,6 +36,12 @@ public class GameLobbyUI : BaseUI
     {
         ResolutionScreen.Unsubscribe(ChangeResolution);
     }
+
+    public void OnClickLegal()
+    {
+        _legalUI?.Init();
+    }
+
 
     public void OnClickClassicBtn()
     {
