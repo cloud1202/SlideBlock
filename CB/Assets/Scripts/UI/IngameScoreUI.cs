@@ -16,7 +16,6 @@ public class IngameScoreUI : BaseUI, IScore
 
     public override void Init()
     {
-        _scoreObj.ResetToken();
         _scoreObj.Init();
         base.Init();
     }
@@ -24,9 +23,9 @@ public class IngameScoreUI : BaseUI, IScore
     private void Awake()
     {
         _initScoreRatio = _scoreBox.anchoredPosition.y / ResolutionScreen.REF_HEIGHT;
-
         ResolutionScreen.Subscribe(ChangeResolution);
     }
+
     private void OnDestroy()
     {
         ResolutionScreen.Unsubscribe(ChangeResolution);
@@ -35,7 +34,7 @@ public class IngameScoreUI : BaseUI, IScore
     public void SetScores()
     {
         _vibrationData.ResetData();
-        ResetToken();
+        StopComboEffects();
         SetScore(0);
     }
 
@@ -48,7 +47,7 @@ public class IngameScoreUI : BaseUI, IScore
     {
         if (comboValue == 0)
         {
-            ResetToken();
+            StopComboEffects();
             return;
         }
 
@@ -57,34 +56,41 @@ public class IngameScoreUI : BaseUI, IScore
             _vibrationData.InitData();
             _vibrationToken = new CancellationTokenSource();
             Utility.AsyncVibrateObject(_score.transform.parent, _vibrationToken, _vibrationData).Forget();
-            _scoreObj.Burst(_vibrationToken.Token).Forget();
+            _scoreObj.Burst();
         }
+
         _vibrationData.UpdateFrequency(comboValue);
         _combo.SetCombo(comboValue, boundCenter).Forget();
     }
 
-    private void ResetToken()
+    private void StopComboEffects()
     {
         _vibrationToken?.Cancel();
         _vibrationToken?.Dispose();
         _vibrationToken = null;
+
+        _scoreObj.StopBurst();
     }
 
     public override void Close()
     {
-        ResetToken();
-        _scoreObj.ResetToken();
+        StopComboEffects();
         base.Close();
     }
 
     private void ChangeResolution(float width, float height, float scaleFactor)
     {
-        if (ResolutionScreen.REF_ASPECT < (width / height))
+        var aspect = (width / height);
+        if (ResolutionScreen.WIDE_ASPECT < aspect)
         {
             _scoreBox.anchoredPosition = new Vector2(0, -30f);
             return;
         }
-
+        else if (ResolutionScreen.REF_ASPECT < aspect)
+        {
+            _scoreBox.anchoredPosition = new Vector2(0, -180f);
+            return;
+        }
         var canvasHeight = PrefabManager.Instance.MainCanvas.rect.height;
         _scoreBox.anchoredPosition = new Vector2(0, canvasHeight * _initScoreRatio);
     }

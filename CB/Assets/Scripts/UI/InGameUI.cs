@@ -29,7 +29,7 @@ public class InGameUI : BaseUI, IScore
     }
     public void SetScores()
     {
-        _scoreUI.SetScore(0);
+        _scoreUI.SetScores();
 
         _highScore.text = Utility.NumberRegularExpression(GameManager.Instance.HighScore);
     }

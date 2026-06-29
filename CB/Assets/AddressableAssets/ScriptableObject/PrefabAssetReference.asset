@@ -117,3 +117,11 @@ MonoBehaviour:
       m_SubObjectGUID: 
       m_EditorAssetChanged: 0
     containLabel: 1
+  - id: 109
+    data:
+      m_AssetGUID: b881188ccb8370f42bb92d2827fa38c1
+      m_SubObjectName: 
+      m_SubObjectType: 
+      m_SubObjectGUID: 
+      m_EditorAssetChanged: 0
+    containLabel: 1

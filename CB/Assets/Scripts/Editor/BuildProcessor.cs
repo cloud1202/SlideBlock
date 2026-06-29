@@ -12,7 +12,6 @@ public static class BuildProcessor
     private static int _major = 1;
     private static int _minor = 0;
     private static int _patch = 0;
-    private static int _bundle = 1;
 
     // 빌드 심볼
     private static string _newSymbol;
@@ -30,6 +29,7 @@ public static class BuildProcessor
 
         _isJenkins = args.Length > 0;
         _newSymbol = "DEVELOP";
+        PlayerSettings.SetScriptingDefineSymbols(NamedBuildTarget.Android, _newSymbol);
         EditorUserBuildSettings.development = true;
         EditorUserBuildSettings.buildAppBundle = false;
         _autoIncrementPatch = false;
@@ -39,14 +39,31 @@ public static class BuildProcessor
         Build(BuildTarget.Android, options);
     }
 
+    [MenuItem("Build/BuildAndroid_Test_Release")]
+    public static void BuildAndroid_Test_Release()
+    {
+        string[] args = Environment.GetCommandLineArgs();
+        _isJenkins = args.Length > 0;
+        _newSymbol = "RELEASE";
+        PlayerSettings.SetScriptingDefineSymbols(NamedBuildTarget.Android, _newSymbol);
+        EditorUserBuildSettings.development = false;
+        EditorUserBuildSettings.buildAppBundle = true;
+        _autoIncrementPatch = false;
+
+        BuildOptions options = BuildOptions.None;
+        Build(BuildTarget.Android, options);
+    }
+
+
     [MenuItem("Build/BuildAndroid_Release")]
     public static void BuildAndroid_Release()
     {
         string[] args = Environment.GetCommandLineArgs();
         _isJenkins = args.Length > 0;
         _newSymbol = "RELEASE";
+        PlayerSettings.SetScriptingDefineSymbols(NamedBuildTarget.Android, _newSymbol);
         EditorUserBuildSettings.development = false;
-        EditorUserBuildSettings.buildAppBundle = false;
+        EditorUserBuildSettings.buildAppBundle = true;
         _autoIncrementPatch = true;
 
         BuildOptions options = BuildOptions.None;
@@ -63,8 +80,6 @@ public static class BuildProcessor
             int.TryParse(parts[1], out _minor);
             int.TryParse(parts[2], out _patch);
         }
-
-        _bundle = PlayerSettings.Android.bundleVersionCode;
     }
 
     //private static void RefreshSymbols()
@@ -101,20 +116,24 @@ public static class BuildProcessor
     public static void Build(BuildTarget buildTarget, BuildOptions buildOptions)
     {
         LoadData();
-        PlayerSettings.SetScriptingDefineSymbols(NamedBuildTarget.Android, _newSymbol);
         // Patch 자동 증가
-        if (_autoIncrementPatch) _patch++;
+        if (_autoIncrementPatch)
+        {
+            _patch++;
+            PlayerSettings.Android.bundleVersionCode++;
+        }
 
         string version = $"{_major}.{_minor}.{_patch}";
         PlayerSettings.bundleVersion = version;
-        PlayerSettings.Android.bundleVersionCode++;
 
         string buildDir = Path.Combine(Application.dataPath, "../Build/Android");
         Directory.CreateDirectory(buildDir);
 
         string fileName;
         if (EditorUserBuildSettings.buildAppBundle)
+        {
             fileName = $"SlideBlock_{version}.aab";
+        }
         else
             fileName = $"SlideBlock_{version}_{_newSymbol}.apk";
 

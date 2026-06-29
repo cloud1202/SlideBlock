@@ -1,106 +1,75 @@
-using Cysharp.Threading.Tasks;
-using System;
-using System.Threading;
 using UnityEngine;
 
 public class BrickParticle : BaseParticle
 {
-    public async UniTaskVoid Play(
-        Vector2 spawnPos,
-        Color color,
-        Vector2 velocity,
-        CancellationToken ct,
-        Action<BrickParticle> onComplete)
+    // --- 런타임 상태 ---
+    private Vector2 _pos;
+    private Vector2 _vel;
+    private float _elapsed;
+    private float _rotSpeed;
+    private Color _baseColor;
+
+    // Play/PlaySpray 구분용
+    private bool _isSpray;
+
+    // -------------------------------------------------------
+    // 활성화
+    // -------------------------------------------------------
+    public void Play(Vector2 spawnPos, Color color, Vector2 velocity)
     {
-        _rt.anchoredPosition = spawnPos;
-        _rt.localRotation = Quaternion.Euler(0f, 0f, UnityEngine.Random.Range(0f, 360f));
-        _rt.sizeDelta = Vector2.one * UnityEngine.Random.Range(8f,16f);
-
-        color.a = 1f;
-        _img.color = color;
-
-        _rt.gameObject.SetActive(true);
-
-        float elapsed = 0f;
-        float rotSpeed = UnityEngine.Random.Range(-180f, 180f);
-        Vector2 pos = spawnPos;
-        Vector2 vel = velocity;
-        
-        while (elapsed < particleData.LifeTime)
-        {
-            if (_rt == null)
-                return;
-            float dt = Time.deltaTime;
-            vel.y += particleData.Gravity * dt;
-            pos += vel * dt;
-            elapsed += dt;
-
-            _rt.anchoredPosition = pos;
-            _rt.Rotate(0,0, rotSpeed * dt);
-
-            float lifeRatio = elapsed / particleData.LifeTime;
-            if (lifeRatio > particleData.FadeStart)
-            {
-                Color faded = color;
-                faded.a = 1f - (lifeRatio - particleData.FadeStart) / (1f - particleData.FadeStart);
-                _img.color = faded;
-            }
-
-            if (ct.IsCancellationRequested) break;
-
-            await UniTask.Yield(PlayerLoopTiming.Update);
-        }
-
-        _rt.gameObject.SetActive(false);
-        onComplete(this);
+        Activate(spawnPos, color, velocity, particleData.MinSize, particleData.MaxSize);
+        _isSpray = false;
     }
-    public async UniTaskVoid PlaySpray(
-        Vector2 spawnPos,
-        Color color,
-        Vector2 velocity,
-        CancellationToken ct,
-        Action<BrickParticle> onComplete)
+
+    public void PlaySpray(Vector2 spawnPos, Color color, Vector2 velocity)
     {
-        _rt.anchoredPosition = spawnPos;
+        Activate(spawnPos, color, velocity, 6f, 8f);
+        _isSpray = true;
+    }
+
+    private void Activate(Vector2 spawnPos, Color color, Vector2 velocity, float minSize, float maxSize)
+    {
+        _pos      = spawnPos;
+        _vel      = velocity;
+        _elapsed  = 0f;
+        _rotSpeed = UnityEngine.Random.Range(-180f, 180f);
+        _baseColor = color;
+        _baseColor.a = 1f;
+
+        _rt.anchoredPosition = _pos;
         _rt.localRotation = Quaternion.Euler(0f, 0f, UnityEngine.Random.Range(0f, 360f));
-        _rt.sizeDelta = Vector2.one * UnityEngine.Random.Range(6f, 8f);
+        _rt.sizeDelta = Vector2.one * UnityEngine.Random.Range(minSize, maxSize);
 
-        color.a = 1f;
-        _img.color = color;
-
+        _img.color = _baseColor;
         _rt.gameObject.SetActive(true);
+        IsActive = true;
+    }
 
-        float elapsed = 0f;
-        float rotSpeed = UnityEngine.Random.Range(-180f, 180f);
-        Vector2 pos = spawnPos;
-        Vector2 vel = velocity;
+    // -------------------------------------------------------
+    // Update 루프에서 호출 — 완료되면 false 반환
+    // -------------------------------------------------------
+    public override bool Tick(float dt)
+    {
+        _vel.y += particleData.Gravity * dt;
+        _pos   += _vel * dt;
+        _elapsed += dt;
 
-        while (elapsed < particleData.LifeTime)
+        _rt.anchoredPosition = _pos;
+        _rt.Rotate(0f, 0f, _rotSpeed * dt);
+
+        float lifeRatio = _elapsed / particleData.LifeTime;
+        if (lifeRatio > particleData.FadeStart)
         {
-            if (_rt == null)
-                return;
-            float dt = Time.deltaTime;
-            vel.y += particleData.Gravity * dt;
-            pos += vel * dt;
-            elapsed += dt;
-
-            _rt.anchoredPosition = pos;
-            _rt.Rotate(0, 0, rotSpeed * dt);
-
-            float lifeRatio = elapsed / particleData.LifeTime;
-            if (lifeRatio > particleData.FadeStart)
-            {
-                Color faded = color;
-                faded.a = 1f - (lifeRatio - particleData.FadeStart) / (1f - particleData.FadeStart);
-                _img.color = faded;
-            }
-
-            if (ct.IsCancellationRequested) break;
-
-            await UniTask.Yield(PlayerLoopTiming.Update);
+            Color faded = _baseColor;
+            faded.a = 1f - (lifeRatio - particleData.FadeStart) / (1f - particleData.FadeStart);
+            _img.color = faded;
         }
 
-        _rt.gameObject.SetActive(false);
-        onComplete(this);
+        if (_elapsed >= particleData.LifeTime)
+        {
+            Stop();
+            return false;
+        }
+        return true;
     }
 }

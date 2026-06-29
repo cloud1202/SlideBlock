@@ -58,30 +58,28 @@ public class SoundManager : ReferenceManager<SoundManager>, IManager
         }
     }
 
-    private bool _isBGMOn;
     public bool IsBGMOn
     {
-        get { return _isBGMOn; }
+        get { return FirebaseManager.Instance.IsBGMOn; }
         set
         {
-            if (_isBGMOn == value)
+            if (FirebaseManager.Instance.IsBGMOn == value)
                 return;
 
-            _isBGMOn = value;
+            FirebaseManager.Instance.IsBGMOn = value;
             _bgmAudio.mute = !value;
         }
     }
 
-    private bool _isSFXOn;
     public bool IsSFXOn
     {
-        get { return _isSFXOn; }
+        get { return FirebaseManager.Instance.IsSFXOn; }
         set
         {
-            if (_isSFXOn == value)
+            if (FirebaseManager.Instance.IsSFXOn == value)
                 return;
 
-            _isSFXOn = value;
+            FirebaseManager.Instance.IsSFXOn = value;
             _sfxAudio.mute = !value;
         }
     }
@@ -101,8 +99,9 @@ public class SoundManager : ReferenceManager<SoundManager>, IManager
 
     async private UniTask LoadSaveFieldData()
     {
-        IsBGMOn = await FirebaseManager.Instance.GetField(SaveFieldType.IsBGMOn, 1) > 0 ? true : false;
-        IsSFXOn = await FirebaseManager.Instance.GetField(SaveFieldType.IsSFXOn, 1) > 0 ? true : false;
+        await UniTask.WaitUntil(() => FirebaseManager.Instance.IsLoadData);
+        _bgmAudio.mute = FirebaseManager.Instance.IsBGMOn;
+        _sfxAudio.mute = FirebaseManager.Instance.IsSFXOn;
     }
 
     async public override UniTask LoadAssetReference()

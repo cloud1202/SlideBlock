@@ -52,10 +52,10 @@ MonoBehaviour:
   _poolSize: 24
   _particleSize: {x: 10, y: 10}
   _gravity: -400
-  _lifeTime: 5
+  _lifeTime: 1.2
   _fadeStart: 0.6
-  _minSize: 6
-  _maxSize: 10
+  _minSize: 8
+  _maxSize: 16
   _scoreTMP: {fileID: 3236110436815376524}
 --- !u!1 &686356738959992689
 GameObject:

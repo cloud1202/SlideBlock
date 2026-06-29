@@ -13,6 +13,7 @@ public static class ResolutionScreen
     public const float REF_WIDTH = 1080f;
     public const float REF_HEIGHT = 1920f;
     public const float REF_ASPECT = REF_WIDTH / REF_HEIGHT;
+    public const float WIDE_ASPECT = 0.8f;
     public const float ORTHOGRAPHIC_SIZE = 5f;
     public const float MATCH_WIDTH_OR_HEIGHT = 0.5f;
 

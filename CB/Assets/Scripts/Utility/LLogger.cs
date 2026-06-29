@@ -20,9 +20,11 @@ public static class LLogger
         var methodName = frame.GetMethod()?.Name ?? "Unknown";
         var lineNumber = frame.GetFileLineNumber();
         var timestamp = System.DateTime.Now.ToString("HH:mm:ss");
-
+#if UNITY_EDITOR
+        var header = $"[{className}::{methodName}:{lineNumber}]";
+#else
         var header = $"[{timestamp}][{className}::{methodName}:{lineNumber}]";
-
+#endif
         var coloredMessage = string.IsNullOrEmpty(color)
             ? $"{header} {message}"
             : $"<color={color}>{header}</color> {message}";

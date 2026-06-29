@@ -15,4 +15,5 @@ public enum PrefabData
     IngameScoreUI,
     LegalUI,
     PopupQuestionUI,
+    LoadingUI,
 }

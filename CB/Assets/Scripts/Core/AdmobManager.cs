@@ -1,3 +1,4 @@
+using Cysharp.Threading.Tasks;
 using GoogleMobileAds.Api;
 using System.Collections.Generic;
 
@@ -26,9 +27,8 @@ public class AdmobManager : SingletonInstance<AdmobManager>, IManager
         // Google Mobile Ads SDK 초기화
         MobileAds.Initialize(initStatus => {
             Logging("Admob 초기화 완료");
+            CreateBanner();
         });
-
-        CreateBanner();
     }
 
     private void CreateBanner()
@@ -47,8 +47,9 @@ public class AdmobManager : SingletonInstance<AdmobManager>, IManager
 
     }
 
-    public void CreateInterstitial()
+    async public UniTask CreateInterstitial(float delay = 0f)
     {
+        await UniTask.WaitForSeconds(delay);
         var adRequest = new AdRequest();
 #if UNITY_EDITOR
         string adUnitId = "ca-app-pub-3940256099942544/1033173712";
@@ -64,6 +65,7 @@ public class AdmobManager : SingletonInstance<AdmobManager>, IManager
                 LLogger.Log("Load Failed Ad");
                 return;
             }
+            
             if(ad != null && ad.CanShowAd())
                 ad.Show();
             LLogger.Log("Load Successfully Ad");

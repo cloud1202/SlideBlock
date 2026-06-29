@@ -14,6 +14,8 @@ public class GameLobbyUI : BaseUI
     private IBaseUI _legalUI;
     public override void Init()
     {
+        _version.text = Application.version;
+
         SoundManager.Instance.PlayBGM(SoundData.Lobby).Forget();
         InitLoadUI().Forget();
     }

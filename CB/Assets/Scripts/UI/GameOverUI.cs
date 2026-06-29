@@ -1,5 +1,4 @@
 using Cysharp.Threading.Tasks;
-using System.Threading;
 using TMPro;
 using UnityEngine;
 
@@ -9,7 +8,6 @@ public class GameOverUI : BaseUI, IScore
     [SerializeField] private TextMeshProUGUI _score;
     [SerializeField] private TextMeshProUGUI _combo;
 
-    private CancellationTokenSource _confettiToken = null;
     public override void Init()
     {
         _highScore.Init();
@@ -18,34 +16,31 @@ public class GameOverUI : BaseUI, IScore
         SoundManager.Instance.PlayBGM().Forget();
     }
 
-    public void SetScores()
-    {
-    }
+    public void SetScores() { }
 
     public void SetScore(int score)
     {
-        if(GameManager.Instance.HighScore < score)
+        if (GameManager.Instance.HighScore < score)
         {
-            UpdateHighScore(score).Forget();
+            UpdateHighScore(score);
         }
         _score.text = Utility.NumberRegularExpression(score);
     }
 
-    async private UniTask UpdateHighScore(int score)
+    private void UpdateHighScore(int score)
     {
         SoundManager.Instance.PlaySFX(SoundData.Confetti).Forget();
-        _confettiToken = new CancellationTokenSource();
-        FirebaseManager.Instance.SaveHighScore(SaveFieldType.HighScore_Classic, score);
-        _highScore.Burst(_confettiToken.Token).Forget();
-
-        await UniTask.WaitForSeconds(2f);
-        AdmobManager.Instance.CreateInterstitial();
+        GameManager.Instance.HighScore = score;
+        _highScore.Burst();
+        
+        AdmobManager.Instance.CreateInterstitial(2f).Forget();
     }
 
     public void UpdateCombo(int combo, Vector2 boundCenter)
     {
         _combo.text = Utility.NumberRegularExpression(combo);
     }
+
     public void OnClickRetryBtn()
     {
         GameManager.Instance.StartRound().Forget();
@@ -57,11 +52,10 @@ public class GameOverUI : BaseUI, IScore
         GameManager.Instance.ExitRound();
         OnClickCloseBtn();
     }
+
     public void OnClickCloseBtn()
     {
-        _confettiToken?.Cancel();
-        _confettiToken?.Dispose();
-        _confettiToken = null;
+        _highScore.StopBurst();
         gameObject.SetActive(false);
     }
 }

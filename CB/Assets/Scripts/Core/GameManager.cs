@@ -1,13 +1,25 @@
 using Cysharp.Threading.Tasks;
-using System.Threading;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
+[ManagerOrder(0)]
 public class GameManager : SingletonInstance<GameManager>, IManager
 {
-    public int HighScore { get; private set; }
+    public int HighScore
+    {
+        get => FirebaseManager.Instance.ClassicScore;
+
+        set
+        {
+            if (FirebaseManager.Instance.ClassicScore == value)
+                return;
+
+            FirebaseManager.Instance.ClassicScore = value;
+        }
+    }
     private IRound _roundManager;
     private IBaseUI _lobbyUI;
+    private IBaseUI _loadingUI;
 
     async public UniTask Bootstrap()
     {
@@ -17,10 +29,13 @@ public class GameManager : SingletonInstance<GameManager>, IManager
         await SoundManager.Instance.LoadAssetReference();
         await PrefabManager.Instance.InitLoadObjects();
         _lobbyUI = await PrefabManager.Instance.InstantiateStaticUI<IBaseUI>(PrefabData.LobbyUI);
-
+        _loadingUI = await PrefabManager.Instance.InstantiateStaticUI<IBaseUI>(PrefabData.LoadingUI);
         _lobbyUI.Init();
-
+        _loadingUI.Init();
         InputManager.Instance.SubscribeToInputHandler(InputType.Game_Exit, OnClickExit);
+        await UniTask.WaitUntil(() => FirebaseManager.Instance.IsLoadData);
+        await UniTask.WaitForSeconds(2f);
+        _loadingUI.Close();
     }
 
     async public UniTask StartRound()
@@ -30,8 +45,6 @@ public class GameManager : SingletonInstance<GameManager>, IManager
             _roundManager = await PrefabManager.Instance.InstantiateObject<IRound>(PrefabData.RoundManager);
             await _roundManager.Init();
         }
-
-        HighScore = await FirebaseManager.Instance.GetField(SaveFieldType.HighScore_Classic, 0);
         _lobbyUI.Close();
         _roundManager.EnterRound();
     }
@@ -59,4 +72,15 @@ public class GameManager : SingletonInstance<GameManager>, IManager
         
     }
 
+    private void OnApplicationPause(bool pause)
+    {
+        //if (pause)
+        //    FirebaseManager.Instance.SaveUserData();
+        //
+    }
+
+    private void OnApplicationQuit()
+    {
+        //FirebaseManager.Instance.SaveUserData();
+    }
 }

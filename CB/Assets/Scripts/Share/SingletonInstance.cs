@@ -47,7 +47,7 @@ public class SingletonInstance<T> : MonoBehaviour
 
     protected void Logging(string log)
     {
-        LLogger.Log(log,color: Colors.Yellow, skipFrames:1);
+        LLogger.Log(log,color: Colors.Yellow, skipFrames:2);
     }
     protected void Warning(string log)
     {

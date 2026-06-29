@@ -1,6 +1,3 @@
-using Cysharp.Threading.Tasks;
-using System;
-using System.Threading;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -9,7 +6,7 @@ public struct ParticleData
 {
     public float Gravity;
     public float LifeTime;
-    public float FadeStart;  // LifeTime ´ëºñ ºñÀ²
+    public float FadeStart;  // LifeTime ê¸°ì¤€ ë¹„ìœ¨
     public float MinSize;
     public float MaxSize;
 
@@ -21,26 +18,32 @@ public struct ParticleData
         MinSize = minSize;
         MaxSize = maxSize;
     }
-    //public ParticleData()
-    //{
-    //    Gravity = -400f;
-    //    LifeTime = 1.2f;
-    //    FadeStart = 0.6f;  // LifeTime ´ëºñ ºñÀ²
-    //}
 }
 
 public class BaseParticle
 {
     protected RectTransform _rt;
     protected Image _img;
-
     protected ParticleData particleData;
 
+    public bool IsActive { get; protected set; }
 
     public void Init(RectTransform rt, Image img, ParticleData data)
     {
         _rt = rt;
         _img = img;
         particleData = data;
+    }
+
+    /// <summary>
+    /// ë§¤ í”„ë ˆì„ Updateì—ì„œ í˜¸ì¶œ. ì™„ë£Œë˜ë©´ falseë¥¼ ë°˜í™˜.
+    /// </summary>
+    public virtual bool Tick(float dt) => false;
+
+    public virtual void Stop()
+    {
+        IsActive = false;
+        if (_rt != null)
+            _rt.gameObject.SetActive(false);
     }
 }

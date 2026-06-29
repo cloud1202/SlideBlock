@@ -8,9 +8,8 @@ using static UnityEngine.InputSystem.InputAction;
 
 public class Board : RoundObject
 {
-    public int MatchCount = 3;
     public const int BOARD_SIZE = 7;
-    private int MATCH_COUNT => MatchCount;
+    private const int MATCH_COUNT = 3;
     private const int INIT_BRICK_COUNT = 4;
     private const float TOUCH_GAP = 0.5f;
     private const float TOUCH_LENGTH = 150f;

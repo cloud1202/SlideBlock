@@ -6,10 +6,11 @@ using Firebase.Crashlytics;
 using Firebase.Extensions;
 using Firebase.Firestore;
 using Firebase.Messaging;
+using GooglePlayGames;
+using GooglePlayGames.BasicApi;
 using System;
-using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.SocialPlatforms.Impl;
+using UnityEngine.SocialPlatforms;
 
 /// <summary>
 /// Firebase 전 기능(Auth, Firestore, Analytics, Crashlytics, Messaging)을 한 곳에서 관리하는 매니저.
@@ -23,7 +24,6 @@ public class FirebaseManager : SingletonInstance<FirebaseManager>, IManager
     public string UserId { get; private set; }
 
     private FirebaseFirestore _firestore;
-    private DocumentSnapshot _snapShot;
     private const string USERS_COLLECTION = "users";
     private const string LEADERBOARD_COLLECTION = "leaderboard";
 
@@ -31,8 +31,53 @@ public class FirebaseManager : SingletonInstance<FirebaseManager>, IManager
     /// 닉네임 설정용 캐시. 랭킹 기록 시 같이 올라감. SetNickname()으로 변경 가능.
     /// </summary>
     public string Nickname { get; private set; } = "Player";
+    public int ClassicScore
+    {
+        get
+        {
+            return _user.ClassicScore;
+        }
+        set
+        {
+            PlayerPrefs.SetInt(SaveFieldData.Fields[EnumConverter.Enum32ToInt(SaveFieldType.HighScore_Classic)], value);
+            _user.ClassicScore = value;
+            _user.IsDirty = true;
+            SaveUserData();
+        }
+    }
+    public bool IsBGMOn
+    {
+        get
+        {
+            return _user.IsBGMOn;
+        }
+        set
+        {
+            PlayerPrefs.SetInt(SaveFieldData.Fields[EnumConverter.Enum32ToInt(SaveFieldType.IsBGMOn)], value.GetHashCode());
+            _user.IsBGMOn = value;
+            _user.IsDirty = true;
+            SaveUserData();
+        }
+    }
+    
+    public bool IsSFXOn
+    {
+        get
+        {
+            return _user.IsSFXOn;
+        }
+        set
+        {
+            PlayerPrefs.SetInt(SaveFieldData.Fields[EnumConverter.Enum32ToInt(SaveFieldType.IsSFXOn)], value.GetHashCode());
+            _user.IsSFXOn = value;
+            _user.IsDirty = true;
+            SaveUserData();
+        }
+    }
 
-    private bool _isInit = false;
+    private UserData _user= null;
+
+    public bool IsLoadData => _user != null;
 
     public override void Init()
     {
@@ -57,7 +102,7 @@ public class FirebaseManager : SingletonInstance<FirebaseManager>, IManager
             Logging("Firebase 초기화 완료");
 
             InitCrashlytics();
-            InitMessaging();
+            //InitMessaging();
             SignInAnonymously();
         });
     }
@@ -76,7 +121,7 @@ public class FirebaseManager : SingletonInstance<FirebaseManager>, IManager
             UserId = auth.CurrentUser.UserId;
             Logging($"[Editor] 기존 세션 재사용: {UserId}");
             Crashlytics.SetUserId(UserId);
-            LoadUserData();
+            LoadUserData().Forget();
             return;
         }
 
@@ -87,10 +132,14 @@ public class FirebaseManager : SingletonInstance<FirebaseManager>, IManager
         {
             UserId = savedUid;
             Logging($"[Editor] 저장된 UID 재사용: {UserId}");
-            LoadUserData();
+            LoadUserData().Forget();
             return;
         }
 #endif
+
+        if (TryPlayGamesAuthentication())
+            return;
+
         auth.SignInAnonymouslyAsync().ContinueWithOnMainThread(task =>
         {
             if (task.IsCanceled || task.IsFaulted)
@@ -109,284 +158,117 @@ public class FirebaseManager : SingletonInstance<FirebaseManager>, IManager
             Logging($"[Editor] UID 저장 완료");
 #endif
             Crashlytics.SetUserId(UserId);
-            LoadUserData();
+            LoadUserData().Forget();
         });
+    }
+
+    private bool TryPlayGamesAuthentication()
+    {
+        try
+        {
+            PlayGamesPlatform.Activate();
+            PlayGamesPlatform.Instance.Authenticate(ProcessAuthentication);
+            return PlayGamesPlatform.Instance.IsAuthenticated();
+        }
+        catch (Exception ex)
+        {
+            Logging(ex.ToString());
+            return false;
+        }
+    }
+    internal void ProcessAuthentication(SignInStatus status)
+    {
+        if (status == SignInStatus.Success)
+        {
+            Logging("PlayGames Login Success");
+            PlayGamesPlatform.Instance.RequestServerSideAccess(
+                false,
+                (string authCode) =>
+                {
+                    Firebase.Auth.FirebaseAuth auth = Firebase.Auth.FirebaseAuth.DefaultInstance;
+                    Firebase.Auth.Credential credential =
+                        Firebase.Auth.PlayGamesAuthProvider.GetCredential(authCode);
+                    auth.SignInAndRetrieveDataWithCredentialAsync(credential).ContinueWith(task => {
+                        if (task.IsCanceled)
+                        {
+                            Error("SignInAndRetrieveDataWithCredentialAsync was canceled.");
+                            return;
+                        }
+                        if (task.IsFaulted)
+                        {
+                            Error("SignInAndRetrieveDataWithCredentialAsync encountered an error: " + task.Exception);
+                            return;
+                        }
+
+                        Firebase.Auth.AuthResult result = task.Result;
+                        Logging($"User signed in successfully: {result.User.DisplayName} ({result.User.UserId})");
+                    });
+                });
+            
+        }
+        else
+        {
+            Logging("PlayGames Login Failed");
+            // Disable your integration with Play Games Services or show a login
+            // button to ask users to sign-in. Clicking it should call
+            // PlayGamesPlatform.Instance.ManuallyAuthenticate(ProcessAuthentication).
+        }
     }
 
     #endregion
 
     #region Firestore
-    async public UniTask<int> GetField(SaveFieldType type, int defaultValue = 0)
-    {
-        await UniTask.WaitUntil(() => _isInit);
-        if (_snapShot == null)
-        {
-            LLogger.Log($"Not Load User Data :: {UserId}");
-            return default;
-        }
-
-        string field = SaveFieldData.Fields[EnumConverter.Enum32ToInt(type)];
-        if (_snapShot.TryGetValue(field, out int ret))
-            return ret;
-        else
-            return PlayerPrefs.GetInt(field, defaultValue);
-    }
-
-    async public UniTask<float> GetField(SaveFieldType type, float defaultValue = 0)
-    {
-        await UniTask.WaitUntil(() => _isInit);
-        if (_snapShot == null)
-        {
-            LLogger.Log($"Not Load User Data :: {UserId}");
-            return default;
-        }
-
-        string field = SaveFieldData.Fields[EnumConverter.Enum32ToInt(type)];
-        if (_snapShot.TryGetValue(field, out float ret))
-            return ret;
-        else
-            return PlayerPrefs.GetFloat(field, defaultValue);
-    }
-
-    async public UniTask<T> GetField<T>(SaveFieldType type, T defaultValue = null)
-        where T : class
-    {
-        await UniTask.WaitUntil(() => _isInit);
-        if (_snapShot == null)
-        {
-            LLogger.Log($"Not Load User Data :: {UserId}");
-            return default;
-        }
-
-        string field = SaveFieldData.Fields[EnumConverter.Enum32ToInt(type)];
-        if (_snapShot.TryGetValue(field, out T ret))
-            return ret;
-        else
-        {
-            var str = PlayerPrefs.GetString(field, string.Empty);
-
-            return JsonUtility.FromJson<T>(str);
-        }
-    }
-
-    public void SaveField(SaveFieldType type, object value)
-    {
-        SaveField(SaveFieldData.Fields[EnumConverter.Enum32ToInt(type)], value);
-    }
-    public void SaveField(SaveFieldType type, float value)
-    {
-        string field = SaveFieldData.Fields[EnumConverter.Enum32ToInt(type)];
-        PlayerPrefs.SetFloat(field, value);
-        SaveField(field, value);
-    }
-    public void SaveField(SaveFieldType type, int value)
-    {
-        string field = SaveFieldData.Fields[EnumConverter.Enum32ToInt(type)];
-        PlayerPrefs.SetInt(field, value);
-        SaveField(field, value);
-    }
-    public void SaveField(SaveFieldType[] type, int[] value)
-    {
-        var dic = new Dictionary<string, object>();
-        for (int i = 0; i< type.Length; ++i)
-        {
-            string field = SaveFieldData.Fields[EnumConverter.Enum32ToInt(type[i])];
-            dic.Add(field, value[i]);
-            PlayerPrefs.SetInt(field, value[i]);
-        }
-        SaveFields(dic);
-    }
     /// <summary>
     /// 유저 문서 한 필드만 병합 저장. 예: SaveField("highScore_classic", 15200)
     /// </summary>
-    public void SaveField(string field, object value)
+    
+    public void SaveUserData()
     {
-        if (!IsInitialized || string.IsNullOrEmpty(UserId))
+        PlayerPrefs.Save();
+        if (!IsInitialized || string.IsNullOrEmpty(UserId) || !IsLoadData)
         {
             Warning("Firestore 저장 실패: 아직 초기화/로그인되지 않음");
             return;
         }
-
-        LLogger.Log($"SaveField {field} :: {value}");
+        LLogger.Log("Save Firestore");
         var docRef = _firestore.Collection(USERS_COLLECTION).Document(UserId);
-        var data = new Dictionary<string, object> { { field, value } };
 
-        docRef.SetAsync(data, SetOptions.MergeAll).ContinueWithOnMainThread(task =>
+        docRef.SetAsync(_user, SetOptions.MergeAll).ContinueWithOnMainThread(task =>
         {
             if (task.IsFaulted || task.IsCanceled)
-                Error($"Firestore 저장 실패 ({field}): {task.Exception}");
+                Error($"Firestore 저장 실패 ({UserId}): {task.Exception}");
+
+            _user.IsDirty = false;
         });
     }
 
-    /// <summary>
-    /// 모드별 최고점수 저장. users(개인)와 leaderboard(공개 랭킹) 양쪽에 반영됨.
-    /// 기존 점수보다 낮으면 leaderboard는 갱신하지 않음(서버에서 최종 검증 전까지는 클라이언트 신뢰 기준).
-    /// </summary>
-    public void SaveHighScore(SaveFieldType mode, int score)
+    async private UniTask LoadUserData()
     {
-        if (mode > SaveFieldType.HighScore_Classic)
-            return;
-
-        string field = SaveFieldData.Fields[EnumConverter.Enum32ToInt(mode)];
-        PlayerPrefs.SetInt(field, score);
-        // 개인 기록(users)에는 항상 저장
-        SaveFields(new Dictionary<string, object>
-        {
-            { field, score },
-            { "lastPlayedAt", Timestamp.GetCurrentTimestamp() }
-        });
-
-        // 공개 랭킹(leaderboard)은 최고점만 반영
-        UpdateLeaderboardIfHigher(field, score);
-    }
-
-    /// <summary>
-    /// 여러 필드를 한 번에 병합 저장.
-    /// </summary>
-    public void SaveFields(Dictionary<string, object> fields)
-    {
-        if (!IsInitialized || string.IsNullOrEmpty(UserId))
-        {
-            Warning("Firestore 저장 실패: 아직 초기화/로그인되지 않음");
-            return;
-        }
-        
-        foreach (var key in fields.Keys)
-        {
-            LLogger.Log($"SaveField {key} :: {fields[key]}");
-        }
-
+        Logging("유저 데이터 로드 시작");
         var docRef = _firestore.Collection(USERS_COLLECTION).Document(UserId);
-        docRef.SetAsync(fields, SetOptions.MergeAll).ContinueWithOnMainThread(task =>
+        try
         {
-            if (task.IsFaulted || task.IsCanceled)
-                Error($"Firestore 저장 실패(다중 필드): {task.Exception}");
-        });
-    }
+            var snapshot = await docRef.GetSnapshotAsync().AsUniTask();
 
-    /// <summary>
-    /// 닉네임 변경. 다음 랭킹 갱신 시 leaderboard 문서에도 반영됨.
-    /// </summary>
-    public void SetNickname(string nickname)
-    {
-        if (string.IsNullOrWhiteSpace(nickname))
-            return;
-
-        Nickname = nickname;
-        SaveField("nickname", nickname);
-    }
-
-    private void UpdateLeaderboardIfHigher(string mode, int score)
-    {
-        if (!IsInitialized || string.IsNullOrEmpty(UserId))
-        {
-            Warning("Leaderboard 저장 실패: 아직 초기화/로그인되지 않음");
-            return;
-        }
-
-        var docRef = _firestore.Collection(LEADERBOARD_COLLECTION).Document(UserId);
-
-        docRef.GetSnapshotAsync().ContinueWithOnMainThread(getTask =>
-        {
-            if (getTask.IsFaulted || getTask.IsCanceled)
+            if (snapshot.Exists)
             {
-                Error($"Leaderboard 조회 실패: {getTask.Exception}");
-                return;
+                _user = snapshot.ConvertTo<UserData>();
             }
-
-            var snapshot = getTask.Result;
-            int previousBest = 0;
-            if (snapshot.Exists && snapshot.ContainsField(mode))
-                previousBest = snapshot.GetValue<int>(mode);
-
-            if (score <= previousBest)
-                return; // 기존 최고점보다 낮으면 갱신할 필요 없음
-
-            var data = new Dictionary<string, object>
-            {
-                { "nickname", Nickname },
-                { mode, score },
-                { "updatedAt", Timestamp.GetCurrentTimestamp() }
-            };
-
-            docRef.SetAsync(data, SetOptions.MergeAll).ContinueWithOnMainThread(setTask =>
-            {
-                if (setTask.IsFaulted || setTask.IsCanceled)
-                    Error($"Leaderboard 저장 실패: {setTask.Exception}");
-                else
-                    Logging($"Leaderboard 갱신: {mode} = {score}");
-            });
-        });
-    }
-
-    /// <summary>
-    /// 모드별 상위 랭킹 조회. 콜백으로 (닉네임, 점수) 리스트 전달.
-    /// 예: GetTopScores("classic", 50, list => { ... });
-    /// </summary>
-    public void GetTopScores(string mode, int limit, Action<List<(string Nickname, int Score)>> onComplete)
-    {
-        if (!IsInitialized)
-        {
-            Warning("Leaderboard 조회 실패: 아직 초기화되지 않음");
-            onComplete?.Invoke(new List<(string, int)>());
-            return;
-        }
-
-        string scoreField = $"highScore_{mode}";
-        _firestore.Collection(LEADERBOARD_COLLECTION)
-            .OrderByDescending(scoreField)
-            .Limit(limit)
-            .GetSnapshotAsync()
-            .ContinueWithOnMainThread(task =>
-            {
-                if (task.IsFaulted || task.IsCanceled)
-                {
-                    Error($"Leaderboard 조회 실패: {task.Exception}");
-                    onComplete?.Invoke(new List<(string, int)>());
-                    return;
-                }
-
-                var result = new List<(string, int)>();
-                foreach (var doc in task.Result.Documents)
-                {
-                    string nickname = doc.ContainsField("nickname") ? doc.GetValue<string>("nickname") : "Player";
-                    int score = doc.ContainsField(scoreField) ? doc.GetValue<int>(scoreField) : 0;
-                    result.Add((nickname, score));
-                }
-
-                onComplete?.Invoke(result);
-            });
-    }
-
-    private void LoadUserData()
-    {
-        var docRef = _firestore.Collection(USERS_COLLECTION).Document(UserId);
-        docRef.GetSnapshotAsync().ContinueWithOnMainThread(task =>
-        {
-            _isInit = true;
-            if (task.IsFaulted || task.IsCanceled)
-            {
-                Error($"유저 데이터 로드 실패: {task.Exception}");
-                return;
-            }
-
-            _snapShot = task.Result;
-            if (!_snapShot.Exists)
+            else
             {
                 Logging("신규 유저, 초기 문서 생성");
-                SaveFields(new Dictionary<string, object>
-                {
-                    { "createdAt", Timestamp.GetCurrentTimestamp() }
-                });
-                return;
+                _user = new UserData();
+                _user.CreatedAt = Timestamp.GetCurrentTimestamp();
+                SaveUserData();
             }
-
             Logging("유저 데이터 로드 완료");
-            if (_snapShot.ContainsField("nickname"))
-                Nickname = _snapShot.GetValue<string>("nickname");
             // 필요 시 여기서 GameManager 등에 로드된 데이터를 전달
             // 예: int highScore = snapshot.GetValue<int>("highScore_classic");
-        });
+        }
+        catch(Exception e)
+        {
+            Error(e.ToString());
+        }
     }
 
     #endregion
@@ -474,7 +356,7 @@ public class FirebaseManager : SingletonInstance<FirebaseManager>, IManager
     private void OnTokenReceived(object sender, TokenReceivedEventArgs e)
     {
         Logging($"FCM 토큰 수신: {e.Token}");
-        SaveField("fcmToken", e.Token);
+        //SaveField("fcmToken", e.Token);
     }
 
     private void OnMessageReceived(object sender, MessageReceivedEventArgs e)
@@ -484,8 +366,8 @@ public class FirebaseManager : SingletonInstance<FirebaseManager>, IManager
 
     private void OnDestroy()
     {
-        FirebaseMessaging.TokenReceived -= OnTokenReceived;
-        FirebaseMessaging.MessageReceived -= OnMessageReceived;
+        //FirebaseMessaging.TokenReceived -= OnTokenReceived;
+        //FirebaseMessaging.MessageReceived -= OnMessageReceived;
     }
 
     #endregion
