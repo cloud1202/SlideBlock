@@ -11,7 +11,6 @@ public class Board : RoundObject
     public const int BOARD_SIZE = 7;
     private const int MATCH_COUNT = 3;
     private const int INIT_BRICK_COUNT = 4;
-    private const float TOUCH_GAP = 0.5f;
     private const float TOUCH_LENGTH = 150f;
     private readonly int BRICK_TYPES = EnumConverter.Enum32ToInt(BrickType.MAX);
     private readonly float[] POS_ARR = new float[] { -2.1f, -1.4f, -0.7f, 0f, 0.7f, 1.4f, 2.1f };
@@ -141,27 +140,27 @@ public class Board : RoundObject
         }
         var pos = context.ReadValue<Vector2>();
 
+        LLogger.Log($"Drag Begin Pos :: {_beginPos.ToString()}");
         var dir = (pos - _beginPos);
         if (dir.magnitude <= TOUCH_LENGTH)
             return;
 
-        _beginPos = Vector2.zero;
+        _beginPos = pos;
         _isDrag = false;
-        if (dir.normalized.x < -TOUCH_GAP)
-            _boardDirection = BoardDirection.Left;
-        else if (dir.normalized.x > TOUCH_GAP)
-            _boardDirection = BoardDirection.Right;
-        else if (dir.normalized.y < -TOUCH_GAP)
-            _boardDirection = BoardDirection.Down;
-        else if (dir.normalized.y > TOUCH_GAP)
-            _boardDirection = BoardDirection.Up;
+        if (Mathf.Abs(dir.x) >= Mathf.Abs(dir.y))
+        {
+            _boardDirection = dir.x < 0 ? BoardDirection.Left : BoardDirection.Right;
+        }
+        else
+        {
+            _boardDirection = dir.y < 0 ? BoardDirection.Down : BoardDirection.Up;
+        }
 
         ChangeBoardDirection(_changeDirectionToken.Token).Forget();
     }
 
     private void OnEndTouchPoint(CallbackContext context)
     {
-        _beginPos = Vector2.zero;
         _isDrag = false;
     }
 
