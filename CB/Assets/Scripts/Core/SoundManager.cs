@@ -100,8 +100,8 @@ public class SoundManager : ReferenceManager<SoundManager>, IManager
     async private UniTask LoadSaveFieldData()
     {
         await UniTask.WaitUntil(() => FirebaseManager.Instance.IsLoadData);
-        _bgmAudio.mute = FirebaseManager.Instance.IsBGMOn;
-        _sfxAudio.mute = FirebaseManager.Instance.IsSFXOn;
+        _bgmAudio.mute = !FirebaseManager.Instance.IsBGMOn;
+        _sfxAudio.mute = !FirebaseManager.Instance.IsSFXOn;
     }
 
     async public override UniTask LoadAssetReference()
