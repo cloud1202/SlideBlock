@@ -30,6 +30,7 @@ public class RoundManager : MonoBehaviour, IRound
 
     public void EnterRound()
     {
+        gameObject.SetActive(true);
         _scoreValue = 0;
         _comboValue = 0;
         _maxCombo = 0;
@@ -40,6 +41,7 @@ public class RoundManager : MonoBehaviour, IRound
     public void EndRound()
     {
         _score.Close();
+        gameObject.SetActive(false);
         _gameOver.Init();
         _gameOver.SetScore(_scoreValue);
         _gameOver.UpdateCombo(_maxCombo);
