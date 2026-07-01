@@ -115,6 +115,7 @@ public static class BuildProcessor
 
     public static void Build(BuildTarget buildTarget, BuildOptions buildOptions)
     {
+        AutoKeystoreFile.ApplyFromDefaultPath();
         LoadData();
         // Patch 자동 증가
         if (_autoIncrementPatch)
