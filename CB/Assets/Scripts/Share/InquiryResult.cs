@@ -5,14 +5,14 @@
 public readonly struct InquiryResult
 {
     public readonly bool IsSuccess;
-    public readonly string ErrorMessage;
+    public readonly GameTextData Message;
 
-    private InquiryResult(bool isSuccess, string errorMessage)
+    private InquiryResult(bool isSuccess, GameTextData message)
     {
         IsSuccess = isSuccess;
-        ErrorMessage = errorMessage;
+        Message = message;
     }
 
-    public static InquiryResult Success() => new InquiryResult(true, null);
-    public static InquiryResult Fail(string message) => new InquiryResult(false, message);
+    public static InquiryResult Success() => new InquiryResult(true, GameTextData.INQURIY_SEND_SUCCESS);
+    public static InquiryResult Fail(GameTextData message) => new InquiryResult(false, message);
 }

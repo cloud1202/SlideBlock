@@ -14,15 +14,27 @@ public class Brick : MonoBehaviour
             return _renderer;
         }
     }
+    [SerializeField] private SpriteRenderer _symbol;
+    [SerializeField] private Sprite[]_symbols;
 
     public BrickType BrickType { get; private set; }
 
     public void Init(BrickType type, Vector2 pos)
     {
         BrickType = type;
-        myRenderer.color = Colors.Sets[0][EnumConverter.Enum32ToInt(type)];
+        var index = EnumConverter.Enum32ToInt(type);
+        myRenderer.color = Colors.Sets[0][index];
+        _symbol.color = Colors.Sets[0][index];
+        _symbol.sprite = _symbols[index];
+        SetSymbolState();
         transform.position = pos;
         gameObject.SetActive(true);
+    }
+
+
+    public void SetSymbolState()
+    {
+        _symbol.gameObject.SetActive(GameManager.Instance.IsSymbolOn);
     }
 
 

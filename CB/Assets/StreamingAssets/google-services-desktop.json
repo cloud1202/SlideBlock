@@ -12,7 +12,20 @@
           "package_name": "com.LayonStudio.SlideBlock"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "298420541978-hi5mrkm1dnng3013pvb8ikpd5us6ptjk.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.LayonStudio.SlideBlock",
+            "certificate_hash": "b0f294e3c5d6ed2e29fe26de08feb1f9de74cd09"
+          }
+        },
+        {
+          "client_id": "298420541978-07rpks9kag4k5vk7t0feg07m6it0gp44.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyCBWHSoF6Sq9fTY5ncm3ISmos42ctXMBfE"
@@ -20,7 +33,12 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "298420541978-07rpks9kag4k5vk7t0feg07m6it0gp44.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }

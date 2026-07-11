@@ -3,36 +3,43 @@ using UnityEngine;
 
 public class MenuUI : BaseUI
 {
-    [SerializeField] private SlideToggle _bgmToggle;
-    [SerializeField] private SlideToggle _sfxToggle;
+    [SerializeField] private SlideToggle _symbolToggle;
+    private IBaseUI _inquriyUI;
 
-    public override void Init()
+    private void Awake()
     {
-        InputManager.Instance.UseInputHandler = false;
-
-        _bgmToggle.SetValueWithoutNotify(SoundManager.Instance.IsBGMOn);
-        _sfxToggle.SetValueWithoutNotify(SoundManager.Instance.IsSFXOn);
-
-        _bgmToggle.OnValueChanged += OnBGMToggleChanged;
-        _sfxToggle.OnValueChanged += OnSFXToggleChanged;
-
-        base.Init();
+        _symbolToggle.SetValueWithoutNotify(GameManager.Instance.IsSymbolOn);
+        _symbolToggle.OnValueChanged += OnSymbolToggleChanged;
     }
 
     private void OnDestroy()
     {
-        _bgmToggle.OnValueChanged -= OnBGMToggleChanged;
-        _sfxToggle.OnValueChanged -= OnSFXToggleChanged;
+        _symbolToggle.OnValueChanged -= OnSymbolToggleChanged;
     }
 
-    private void OnBGMToggleChanged(bool value)
+    public override void Init()
     {
-        SoundManager.Instance.IsBGMOn = value;
+        InputManager.Instance.UseInputHandler = false;
+        InitLoadUI().Forget();
     }
 
-    private void OnSFXToggleChanged(bool value)
+    async private UniTask InitLoadUI()
     {
-        SoundManager.Instance.IsSFXOn = value;
+        if (_inquriyUI == null)
+            _inquriyUI = await PrefabManager.Instance.InstantiateDynamicUI<IBaseUI>(PrefabData.InquriyUI, this.transform);
+
+        base.Init();
+    }
+
+    private void OnSymbolToggleChanged(bool value)
+    {
+        GameManager.Instance.IsSymbolOn = value;
+    }
+
+
+    public void OnClickInquriyBtn()
+    {
+        _inquriyUI.Init();
     }
 
     public void OnClickRetryBtn()

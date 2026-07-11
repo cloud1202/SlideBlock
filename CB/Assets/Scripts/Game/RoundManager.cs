@@ -1,11 +1,13 @@
 using Cysharp.Threading.Tasks;
+using System;
 using UnityEngine;
 
 public class RoundManager : MonoBehaviour, IRound
 {
+    public event Action OnUpdateSymbolState;
     private const float COMBO_DELAY = 5f;
     private RoundObject _board;
-    private IScore _score;
+    private IScore _ingameUI;
     private IScore _gameOver;
 
     private int _scoreValue = 0;
@@ -20,12 +22,17 @@ public class RoundManager : MonoBehaviour, IRound
 
     async private UniTask LoadRoundObjects()
     {
-        _score = await PrefabManager.Instance.InstantiateStaticUI<IScore>(PrefabData.InGameUI);
+        _ingameUI = await PrefabManager.Instance.InstantiateStaticUI<IScore>(PrefabData.InGameUI);
         _gameOver = await PrefabManager.Instance.InstantiateDynamicUI<IScore>(PrefabData.GameOverUI);
         _board = await PrefabManager.Instance.InstantiateObject<RoundObject>(PrefabData.Board, this.transform);
         _board.SetRoundManager(this);
 
         _timer = Timer.CreateTimer(COMBO_DELAY, ResetCombo);
+    }
+
+    public void ChangeSymbolState()
+    {
+        OnUpdateSymbolState();
     }
 
     public void EnterRound()
@@ -34,13 +41,13 @@ public class RoundManager : MonoBehaviour, IRound
         _scoreValue = 0;
         _comboValue = 0;
         _maxCombo = 0;
-        _score.Init();
+        _ingameUI.Init();
         _board.Init();
     }
 
     public void EndRound()
     {
-        _score.Close();
+        _ingameUI.Close();
         gameObject.SetActive(false);
         _gameOver.Init();
         _gameOver.SetScore(_scoreValue);
@@ -50,7 +57,7 @@ public class RoundManager : MonoBehaviour, IRound
     public void ExitRound()
     {
         FirebaseManager.Instance.LogEvent("Move Home");
-        _score.Close();
+        _ingameUI.Close();
         _gameOver.Close();
         Destroy(gameObject);
     }
@@ -60,7 +67,7 @@ public class RoundManager : MonoBehaviour, IRound
         UpdateCombo(addScore > 0, boundCenter);
 
         _scoreValue += Utility.CalcScore(addScore, _comboValue);
-        _score.SetScore(_scoreValue);
+        _ingameUI.SetScore(_scoreValue);
     }
 
     private void UpdateCombo(bool isCombo, Vector2 boundCenter)
@@ -70,7 +77,7 @@ public class RoundManager : MonoBehaviour, IRound
 
         Utility.AsyncDurationVibrateObject(PrefabManager.Instance.MainCamera.transform, new System.Threading.CancellationTokenSource()).Forget();
         _comboValue++;
-        _score.UpdateCombo(_comboValue, boundCenter);
+        _ingameUI.UpdateCombo(_comboValue, boundCenter);
         _timer.Start();
         _maxCombo = Mathf.Max(_comboValue, _maxCombo);
     }
@@ -78,7 +85,7 @@ public class RoundManager : MonoBehaviour, IRound
     private void ResetCombo()
     {
         _comboValue = 0;
-        _score.UpdateCombo(_comboValue, Vector2.zero);
+        _ingameUI.UpdateCombo(_comboValue, Vector2.zero);
         _timer.Reset();
     }
 }

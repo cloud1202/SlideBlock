@@ -17,6 +17,21 @@ public class GameManager : SingletonInstance<GameManager>, IManager
             FirebaseManager.Instance.ClassicScore = value;
         }
     }
+    public bool IsSymbolOn
+    {
+        get => FirebaseManager.Instance.IsSymbolOn;
+
+        set
+        {
+            if (FirebaseManager.Instance.IsSymbolOn == value)
+                return;
+
+            FirebaseManager.Instance.IsSymbolOn = value;
+            _roundManager?.ChangeSymbolState();
+        }
+    }
+
+    public LanguageType Language = LanguageType.English;
     private IRound _roundManager;
     private IBaseUI _lobbyUI;
     private IBaseUI _loadingUI;
@@ -27,6 +42,7 @@ public class GameManager : SingletonInstance<GameManager>, IManager
         await AddressableManager.Instance.SetAddressable();
         await PrefabManager.Instance.LoadAssetReference();
         await SoundManager.Instance.LoadAssetReference();
+        await TextDataManager.Instance.LoadAssetReference();
         await PrefabManager.Instance.InitLoadObjects();
         _lobbyUI = await PrefabManager.Instance.InstantiateStaticUI<IBaseUI>(PrefabData.LobbyUI);
         _loadingUI = await PrefabManager.Instance.InstantiateStaticUI<IBaseUI>(PrefabData.LoadingUI);
@@ -68,7 +84,8 @@ public class GameManager : SingletonInstance<GameManager>, IManager
     {
         var popup = await PrefabManager.Instance.InstantiateDynamicUI<IPopupQuestion>(PrefabData.PopupQuestionUI);
 
-        popup.Init(() => Application.Quit());
+        popup.SetNoticeContent(GameTextData.POPUP_EXIT_GAME);
+        popup.RegistQuestionAction(() => Application.Quit());
         
     }
 

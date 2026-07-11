@@ -91,6 +91,7 @@ public class Board : RoundObject
         {
             var brick = await PrefabManager.Instance.InstantiateObject<Brick>(PrefabData.Brick, this.transform);
             brick.gameObject.SetActive(false);
+            _roundManager.OnUpdateSymbolState += brick.SetSymbolState;
             _bricks.Enqueue(brick);
         }
 

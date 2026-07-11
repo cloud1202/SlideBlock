@@ -79,6 +79,21 @@ public class FirebaseManager : SingletonInstance<FirebaseManager>, IManager
         }
     }
 
+    public bool IsSymbolOn
+    {
+        get
+        {
+            return _user.IsSFXOn;
+        }
+        set
+        {
+            PlayerPrefs.SetInt(SaveFieldData.Fields[EnumConverter.Enum32ToInt(SaveFieldType.IsSymbolOn)], value.GetHashCode());
+            _user.IsSFXOn = value;
+            _user.IsDirty = true;
+            SaveUserData();
+        }
+    }
+
     private UserData _user= null;
 
     public bool IsLoadData => _user != null;
@@ -182,7 +197,7 @@ public class FirebaseManager : SingletonInstance<FirebaseManager>, IManager
                 {
                     Credential credential =
                         PlayGamesAuthProvider.GetCredential(authCode);
-                    auth.SignInAndRetrieveDataWithCredentialAsync(credential).ContinueWith(SignInAuth);
+                    auth.SignInAndRetrieveDataWithCredentialAsync(credential).ContinueWithOnMainThread(SignInAuth);
                 });
 
             Nickname = PlayGamesPlatform.Instance.localUser.userName;
@@ -393,12 +408,12 @@ public class FirebaseManager : SingletonInstance<FirebaseManager>, IManager
     {
         if (string.IsNullOrWhiteSpace(content))
         {
-            return InquiryResult.Fail("문의 내용을 입력해주세요.");
+            return InquiryResult.Fail(GameTextData.INQURIY_SEND_FAIL_1);
         }
 
         if (content.Length > 2000)
         {
-            return InquiryResult.Fail("문의 내용이 너무 깁니다. (최대 2000자)");
+            return InquiryResult.Fail(GameTextData.INQURIY_SEND_FAIL_2);
         }
 
         // 연타/스팸 방지
@@ -406,7 +421,7 @@ public class FirebaseManager : SingletonInstance<FirebaseManager>, IManager
         if (elapsed < MIN_INTERVAL_SECONDS)
         {
             var remain = MIN_INTERVAL_SECONDS - (int)elapsed;
-            return InquiryResult.Fail($"{remain}초 후에 다시 시도해주세요.");
+            return InquiryResult.Fail(GameTextData.INQURIY_SEND_FAIL_3);
         }
 
         try
@@ -432,7 +447,7 @@ public class FirebaseManager : SingletonInstance<FirebaseManager>, IManager
         catch (Exception e)
         {
             Debug.LogError($"[InquiryManager] 문의 전송 실패: {e}");
-            return InquiryResult.Fail("전송에 실패했습니다. 네트워크 상태를 확인해주세요.");
+            return InquiryResult.Fail(GameTextData.INQURIY_SEND_FAIL_4);
         }
     }
 

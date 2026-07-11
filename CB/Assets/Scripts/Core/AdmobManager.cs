@@ -3,6 +3,7 @@ using GoogleMobileAds.Api;
 using GoogleMobileAds.Ump.Api;
 using System.Collections.Generic;
 
+[ManagerOrder(2)]
 public class AdmobManager : SingletonInstance<AdmobManager>, IManager
 {
     public bool IsPrivacyOptionsRequire = ConsentInformation.PrivacyOptionsRequirementStatus == PrivacyOptionsRequirementStatus.Required;
@@ -18,21 +19,6 @@ public class AdmobManager : SingletonInstance<AdmobManager>, IManager
 
     private void InitializeAndLoadAds()
     {
-#if DEVELOP
-        List<string> testDeviceIds = new List<string>()
-        {
-            "ab211322-c33c-4e56-baf5-86a13cbd86a2"
-        };
-        RequestConfiguration requestConfiguration = new RequestConfiguration();
-        requestConfiguration.TestDeviceIds = testDeviceIds;
-
-        MobileAds.SetRequestConfiguration(requestConfiguration);
-
-        for(int i = 0; i < testDeviceIds.Count; ++i)
-        {
-            Logging($"Test Device 등록 : {testDeviceIds[i]}");
-        }
-#endif
         // Google Mobile Ads SDK 초기화
         MobileAds.Initialize(initStatus =>
         {
