@@ -83,12 +83,12 @@ public class FirebaseManager : SingletonInstance<FirebaseManager>, IManager
     {
         get
         {
-            return _user.IsSFXOn;
+            return _user.IsSymbolOn;
         }
         set
         {
             PlayerPrefs.SetInt(SaveFieldData.Fields[EnumConverter.Enum32ToInt(SaveFieldType.IsSymbolOn)], value.GetHashCode());
-            _user.IsSFXOn = value;
+            _user.IsSymbolOn = value;
             _user.IsDirty = true;
             SaveUserData();
         }
