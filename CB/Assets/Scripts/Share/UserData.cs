@@ -9,6 +9,7 @@ public class UserData
         ClassicScore = PlayerPrefs.GetInt(SaveFieldData.Fields[EnumConverter.Enum32ToInt(SaveFieldType.HighScore_Classic)], 0);
         IsBGMOn = PlayerPrefs.GetInt(SaveFieldData.Fields[EnumConverter.Enum32ToInt(SaveFieldType.IsBGMOn)], 1) > 0 ? true : false;
         IsSFXOn = PlayerPrefs.GetInt(SaveFieldData.Fields[EnumConverter.Enum32ToInt(SaveFieldType.IsSFXOn)], 1) > 0 ? true : false;
+        IsSymbolOn = PlayerPrefs.GetInt(SaveFieldData.Fields[EnumConverter.Enum32ToInt(SaveFieldType.IsSymbolOn)], 1) > 0 ? true : false;
     }
 
     // DB 필드명: "high_score" → C# 프로퍼티명: HighScore
@@ -26,5 +27,8 @@ public class UserData
 
     [FirestoreProperty("IsSFXOn")]
     public bool IsSFXOn { get; set; } = true;
+
+    [FirestoreProperty("IsSymbolOn")]
+    public bool IsSymbolOn { get; set; } = true;
     public bool IsDirty { get; set; } = false;
 }

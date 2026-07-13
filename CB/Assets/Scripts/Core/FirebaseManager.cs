@@ -9,6 +9,7 @@ using Firebase.Messaging;
 using GooglePlayGames;
 using GooglePlayGames.BasicApi;
 using System;
+using System.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.SocialPlatforms;
 
@@ -25,8 +26,12 @@ public class FirebaseManager : SingletonInstance<FirebaseManager>, IManager
 
     private FirebaseFirestore _firestore;
     private const string USERS_COLLECTION = "users";
-    private const string LEADERBOARD_COLLECTION = "leaderboard";
+    private const string LEADERBOARD_COLLECTION = "leaderboard"; 
+    private const string MAIL_COLLECTION = "mail";
+    private const string RECEIVER_EMAIL = "oortcloud98@gmail.com";
+    private const int MIN_INTERVAL_SECONDS = 60; // 스팸 방지: 최소 발송 간격
 
+    private DateTime _lastSentTimeUtc = DateTime.MinValue;
     /// <summary>
     /// 닉네임 설정용 캐시. 랭킹 기록 시 같이 올라감. SetNickname()으로 변경 가능.
     /// </summary>
@@ -59,7 +64,6 @@ public class FirebaseManager : SingletonInstance<FirebaseManager>, IManager
             SaveUserData();
         }
     }
-    
     public bool IsSFXOn
     {
         get
@@ -70,6 +74,21 @@ public class FirebaseManager : SingletonInstance<FirebaseManager>, IManager
         {
             PlayerPrefs.SetInt(SaveFieldData.Fields[EnumConverter.Enum32ToInt(SaveFieldType.IsSFXOn)], value.GetHashCode());
             _user.IsSFXOn = value;
+            _user.IsDirty = true;
+            SaveUserData();
+        }
+    }
+
+    public bool IsSymbolOn
+    {
+        get
+        {
+            return _user.IsSymbolOn;
+        }
+        set
+        {
+            PlayerPrefs.SetInt(SaveFieldData.Fields[EnumConverter.Enum32ToInt(SaveFieldType.IsSymbolOn)], value.GetHashCode());
+            _user.IsSymbolOn = value;
             _user.IsDirty = true;
             SaveUserData();
         }
@@ -103,7 +122,7 @@ public class FirebaseManager : SingletonInstance<FirebaseManager>, IManager
 
             InitCrashlytics();
             //InitMessaging();
-            SignInAnonymously();
+            SignInAuth();
         });
     }
 
@@ -111,10 +130,11 @@ public class FirebaseManager : SingletonInstance<FirebaseManager>, IManager
 
     #region Authentication
 
-    private void SignInAnonymously()
+    private void SignInAuth()
     {
         FirebaseAuth auth = FirebaseAuth.DefaultInstance;
 #if UNITY_EDITOR
+        Nickname = "TestPlayer";
         // 에디터: 기존 로그인 세션 재사용 시도
         if (auth.CurrentUser != null)
         {
@@ -140,26 +160,14 @@ public class FirebaseManager : SingletonInstance<FirebaseManager>, IManager
         if (TryPlayGamesAuthentication())
             return;
 
-        auth.SignInAnonymouslyAsync().ContinueWithOnMainThread(task =>
-        {
-            if (task.IsCanceled || task.IsFaulted)
-            {
-                Error($"익명 로그인 실패: {task.Exception}");
-                return;
-            }
+    }
+    
+    public void ManuallyAuthentication()
+    {
+        if (PlayGamesPlatform.Instance.IsAuthenticated())
+            return;
 
-            UserId = task.Result.User.UserId;
-            Logging($"로그인 완료, UID: {UserId}");
-
-#if UNITY_EDITOR
-            // 에디터에서 첫 로그인 시 저장
-            PlayerPrefs.SetString("editor_uid", UserId);
-            PlayerPrefs.Save();
-            Logging($"[Editor] UID 저장 완료");
-#endif
-            Crashlytics.SetUserId(UserId);
-            LoadUserData().Forget();
-        });
+        PlayGamesPlatform.Instance.ManuallyAuthenticate(ProcessAuthentication);
     }
 
     private bool TryPlayGamesAuthentication()
@@ -176,8 +184,10 @@ public class FirebaseManager : SingletonInstance<FirebaseManager>, IManager
             return false;
         }
     }
+
     internal void ProcessAuthentication(SignInStatus status)
     {
+        FirebaseAuth auth = FirebaseAuth.DefaultInstance;
         if (status == SignInStatus.Success)
         {
             Logging("PlayGames Login Success");
@@ -185,34 +195,49 @@ public class FirebaseManager : SingletonInstance<FirebaseManager>, IManager
                 false,
                 (string authCode) =>
                 {
-                    Firebase.Auth.FirebaseAuth auth = Firebase.Auth.FirebaseAuth.DefaultInstance;
-                    Firebase.Auth.Credential credential =
-                        Firebase.Auth.PlayGamesAuthProvider.GetCredential(authCode);
-                    auth.SignInAndRetrieveDataWithCredentialAsync(credential).ContinueWith(task => {
-                        if (task.IsCanceled)
-                        {
-                            Error("SignInAndRetrieveDataWithCredentialAsync was canceled.");
-                            return;
-                        }
-                        if (task.IsFaulted)
-                        {
-                            Error("SignInAndRetrieveDataWithCredentialAsync encountered an error: " + task.Exception);
-                            return;
-                        }
-
-                        Firebase.Auth.AuthResult result = task.Result;
-                        Logging($"User signed in successfully: {result.User.DisplayName} ({result.User.UserId})");
-                    });
+                    Credential credential =
+                        PlayGamesAuthProvider.GetCredential(authCode);
+                    auth.SignInAndRetrieveDataWithCredentialAsync(credential).ContinueWithOnMainThread(SignInAuth);
                 });
+
+            Nickname = PlayGamesPlatform.Instance.localUser.userName;
             
         }
         else
         {
             Logging("PlayGames Login Failed");
+            auth.SignInAnonymouslyAsync().ContinueWithOnMainThread(SignInAuth);
+            Nickname = string.Empty;
             // Disable your integration with Play Games Services or show a login
             // button to ask users to sign-in. Clicking it should call
             // PlayGamesPlatform.Instance.ManuallyAuthenticate(ProcessAuthentication).
         }
+    }
+
+    private void SignInAuth(Task<AuthResult> task)
+    {
+        if (task.IsCanceled)
+        {
+            Error("SignInAndRetrieveDataWithCredentialAsync was canceled.");
+            return;
+        }
+        if (task.IsFaulted)
+        {
+            Error("SignInAndRetrieveDataWithCredentialAsync encountered an error: " + task.Exception);
+            return;
+        }
+
+#if UNITY_EDITOR
+        // 에디터에서 첫 로그인 시 저장
+        PlayerPrefs.SetString("editor_uid", UserId);
+        PlayerPrefs.Save();
+        Logging($"[Editor] UID 저장 완료");
+#endif
+        AuthResult result = task.Result;
+        UserId = result.User.UserId;
+        Crashlytics.SetUserId(UserId);
+        LoadUserData().Forget();
+        Logging($"User signed in successfully: {result.User.DisplayName} ({result.User.UserId})");
     }
 
     #endregion
@@ -371,4 +396,80 @@ public class FirebaseManager : SingletonInstance<FirebaseManager>, IManager
     }
 
     #endregion
+
+    #region Public API
+
+    /// <summary>
+    /// 문의 내용을 전송한다.
+    /// </summary>
+    /// <param name="content">유저가 입력한 문의 내용</param>
+    /// <param name="userEmail">답장을 받을 유저 이메일 (선택, 없으면 익명)</param>
+    public async UniTask<InquiryResult> SendInquiryAsync(string content, string userEmail = null)
+    {
+        if (string.IsNullOrWhiteSpace(content))
+        {
+            return InquiryResult.Fail(GameTextData.INQURIY_SEND_FAIL_1);
+        }
+
+        if (content.Length > 2000)
+        {
+            return InquiryResult.Fail(GameTextData.INQURIY_SEND_FAIL_2);
+        }
+
+        // 연타/스팸 방지
+        var elapsed = (DateTime.UtcNow - _lastSentTimeUtc).TotalSeconds;
+        if (elapsed < MIN_INTERVAL_SECONDS)
+        {
+            var remain = MIN_INTERVAL_SECONDS - (int)elapsed;
+            return InquiryResult.Fail(GameTextData.INQURIY_SEND_FAIL_3);
+        }
+
+        try
+        {
+            var body = BuildEmailBody(content, userEmail);
+
+            var docData = new System.Collections.Generic.Dictionary<string, object>
+                {
+                    { "to", RECEIVER_EMAIL },
+                    { "message", new System.Collections.Generic.Dictionary<string, object>
+                        {
+                            { "subject", $"[Slide Block] 문의가 도착했습니다" },
+                            { "text", body }
+                        }
+                    }
+                };
+
+            await _firestore.Collection(MAIL_COLLECTION).AddAsync(docData).AsUniTask();
+
+            _lastSentTimeUtc = DateTime.UtcNow;
+            return InquiryResult.Success();
+        }
+        catch (Exception e)
+        {
+            Debug.LogError($"[InquiryManager] 문의 전송 실패: {e}");
+            return InquiryResult.Fail(GameTextData.INQURIY_SEND_FAIL_4);
+        }
+    }
+
+    #endregion
+
+    #region Private Helpers
+
+    private string BuildEmailBody(string content, string userEmail)
+    {
+        var deviceInfo = $"{SystemInfo.deviceModel} / OS: {SystemInfo.operatingSystem}";
+        var appVersion = Application.version;
+        var replyTo = string.IsNullOrEmpty(userEmail) ? "(미입력)" : userEmail;
+
+        return
+            $"문의 내용:\n{content}\n\n" +
+            $"---\n" +
+            $"답장 받을 이메일: {replyTo}\n" +
+            $"앱 버전: {appVersion}\n" +
+            $"기기 정보: {deviceInfo}\n" +
+            $"전송 시각(UTC): {DateTime.UtcNow:yyyy-MM-dd HH:mm:ss}";
+    }
+
+    #endregion
 }
+

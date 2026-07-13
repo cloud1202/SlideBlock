@@ -15,6 +15,17 @@ public class SafeAreaFitter : MonoBehaviour, ISafeAreaFitter
 
         if (_root == null)
             return;
+
+        ResolutionScreen.Subscribe(ChangeResolution);
+    }
+
+    private void OnDestroy()
+    {
+        ResolutionScreen.Unsubscribe(ChangeResolution);
+    }
+
+    private void ChangeResolution(float width, float height, float scaleFactor)
+    {
         Apply();
     }
     void Apply()

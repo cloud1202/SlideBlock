@@ -46,6 +46,7 @@ public static class BuildProcessor
         _isJenkins = args.Length > 0;
         _newSymbol = "RELEASE";
         PlayerSettings.SetScriptingDefineSymbols(NamedBuildTarget.Android, _newSymbol);
+        AutoKeystoreFile.ApplyFromDefaultPath();
         EditorUserBuildSettings.development = false;
         EditorUserBuildSettings.buildAppBundle = true;
         _autoIncrementPatch = false;
@@ -62,6 +63,7 @@ public static class BuildProcessor
         _isJenkins = args.Length > 0;
         _newSymbol = "RELEASE";
         PlayerSettings.SetScriptingDefineSymbols(NamedBuildTarget.Android, _newSymbol);
+        AutoKeystoreFile.ApplyFromDefaultPath();
         EditorUserBuildSettings.development = false;
         EditorUserBuildSettings.buildAppBundle = true;
         _autoIncrementPatch = true;

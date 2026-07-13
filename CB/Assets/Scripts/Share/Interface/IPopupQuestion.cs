@@ -1,7 +1,7 @@
 using System;
 using UnityEngine;
 
-public interface IPopupQuestion : IBaseUI
+public interface IPopupQuestion : IBaseUI, IPopupNotice
 {
-    public void Init(Action onClickYesAction = null, Action onClickNoAction = null);
+    public void RegistQuestionAction(Action onClickYesAction = null, Action onClickNoAction = null);
 }

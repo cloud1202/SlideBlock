@@ -6,6 +6,7 @@ using System;
 using Cysharp.Threading.Tasks;
 using System.Threading.Tasks;
 using System.Threading;
+using TMPro;
 
 public static class Utility
 {
@@ -33,6 +34,17 @@ public static class Utility
         return Mathf.RoundToInt(score * (combo + 1) * 0.5f);
     }
 
+    public static Vector2 UpdateLayoutSize(TextMeshProUGUI tmp, Vector2 min, Vector2 max, Vector2 padding)
+    {
+        Vector2 unwrapped = tmp.GetPreferredValues(tmp.text, 0f, 0f);
+        float width = Mathf.Clamp(unwrapped.x + padding.x, min.x, max.x);
+
+        float availableWidth = width - padding.x;
+        Vector2 wrapped = tmp.GetPreferredValues(tmp.text, availableWidth, 0f);
+        float height = Mathf.Max(wrapped.y + padding.y, min.y);
+
+        return new Vector2(width, height);
+    }
     public static async UniTask AsyncToastGraphicObject(Graphic graphic)
     {
         var posY = graphic.rectTransform.anchoredPosition.y;

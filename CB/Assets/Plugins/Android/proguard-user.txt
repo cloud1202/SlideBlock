@@ -1,0 +1,9 @@
+-keep class com.google.android.gms.games.** { *; }
+-keep class com.google.android.gms.common.** { *; }
+-keep class com.google.android.gms.tasks.** { *; }
+-keep class com.google.android.gms.auth.** { *; }
+-keep class com.google.games.bridge.** { *; }
+-keepattributes *Annotation*
+-keepattributes Signature
+-keepattributes InnerClasses
+-dontwarn com.google.android.gms.**

@@ -174,7 +174,7 @@ PlayerSettings:
     iPhone: 0
     tvOS: 0
   overrideDefaultApplicationIdentifier: 1
-  AndroidBundleVersionCode: 8
+  AndroidBundleVersionCode: 15
   AndroidMinSdkVersion: 24
   AndroidTargetSdkVersion: 0
   AndroidPreferredInstallLocation: 1
@@ -268,7 +268,7 @@ PlayerSettings:
   AndroidTargetArchitectures: 2
   AndroidSplashScreenScale: 0
   androidSplashScreen: {fileID: 0}
-  AndroidKeystoreName: '{inproject}: slideBlock.keystore'
+  AndroidKeystoreName: F:/Keystores/slideBlock.keystore
   AndroidKeyaliasName: admin
   AndroidEnableArmv9SecurityFeatures: 0
   AndroidEnableArm64MTE: 0
