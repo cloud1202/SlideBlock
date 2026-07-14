@@ -30,6 +30,7 @@ public static class BuildProcessor
         _isJenkins = args.Length > 0;
         _newSymbol = "DEVELOP";
         PlayerSettings.SetScriptingDefineSymbols(NamedBuildTarget.Android, _newSymbol);
+        AutoKeystoreFile.ApplyFromDefaultPath();
         EditorUserBuildSettings.development = true;
         EditorUserBuildSettings.buildAppBundle = false;
         _autoIncrementPatch = false;

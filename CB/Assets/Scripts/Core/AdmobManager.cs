@@ -12,17 +12,17 @@ public class AdmobManager : SingletonInstance<AdmobManager>, IManager
     public override void Init()
     {
         base.Init();
-        Logging("Admob ÃÊ±âÈ­ ½ÃÀÛ");
+        Logging("Admob ï¿½Ê±ï¿½È­ ï¿½ï¿½ï¿½ï¿½");
 
         RequestConsent();
     }
 
     private void InitializeAndLoadAds()
     {
-        // Google Mobile Ads SDK ÃÊ±âÈ­
+        // Google Mobile Ads SDK ï¿½Ê±ï¿½È­
         MobileAds.Initialize(initStatus =>
         {
-            Logging("Admob ÃÊ±âÈ­ ¿Ï·á");
+            Logging("Admob ï¿½Ê±ï¿½È­ ï¿½Ï·ï¿½");
             CreateBanner();
         });
     }
@@ -76,7 +76,7 @@ public class AdmobManager : SingletonInstance<AdmobManager>, IManager
 #if DEVELOP
         List<string> testDeviceIds = new List<string>()
         {
-            "ab211322-c33c-4e56-baf5-86a13cbd86a2"
+                "d3bf1a7d-f4d1-4d8d-aef0-baf9f1964149"
         };
         RequestConfiguration requestConfiguration = new RequestConfiguration();
         requestConfiguration.TestDeviceIds = testDeviceIds;
@@ -85,15 +85,15 @@ public class AdmobManager : SingletonInstance<AdmobManager>, IManager
 
         for(int i = 0; i < testDeviceIds.Count; ++i)
         {
-            Logging($"Test Device µî·Ï : {testDeviceIds[i]}");
+            Logging($"Test Device ï¿½ï¿½ï¿½ : {testDeviceIds[i]}");
         }
         var debugSettings = new ConsentDebugSettings
         {
-            // ÀÌ ±â±â¸¦ À¯·´(EEA)¿¡ ÀÖ´Â °ÍÃ³·³ °­Á¦ ¼³Á¤
+            // ï¿½ï¿½ ï¿½ï¿½â¸¦ ï¿½ï¿½ï¿½ï¿½(EEA)ï¿½ï¿½ ï¿½Ö´ï¿½ ï¿½ï¿½Ã³ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
             DebugGeography = DebugGeography.EEA,
 
-            // ¾Æ·¡ ÇØ½Ã ID¸¦ µî·ÏÇÑ ±â±â¿¡¼­¸¸ µð¹ö±× Áö¿À±×·¡ÇÇ°¡ Àû¿ëµÊ
-            TestDeviceHashedIds = new List<string> { "ab211322-c33c-4e56-baf5-86a13cbd86a2" }
+            // ï¿½Æ·ï¿½ ï¿½Ø½ï¿½ IDï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½â¿¡ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½×·ï¿½ï¿½Ç°ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½
+            TestDeviceHashedIds = new List<string> { "E5944ED84A275FD9C977D24B86436A32" }
         };
 
         requestParams = new ConsentRequestParameters
@@ -104,7 +104,7 @@ public class AdmobManager : SingletonInstance<AdmobManager>, IManager
         requestParams = new ConsentRequestParameters();
 #endif
 
-        // ¾Û ½ÇÇà¸¶´Ù ¸Å¹ø È£ÃâÇØ¾ß ÇÔ (Àçµ¿ÀÇ ÇÊ¿ä ¿©ºÎ¸¦ ¸Å¹ø Ã¼Å©ÇÏ±â ¶§¹®)
+        // ï¿½ï¿½ ï¿½ï¿½ï¿½à¸¶ï¿½ï¿½ ï¿½Å¹ï¿½ È£ï¿½ï¿½ï¿½Ø¾ï¿½ ï¿½ï¿½ (ï¿½çµ¿ï¿½ï¿½ ï¿½Ê¿ï¿½ ï¿½ï¿½ï¿½Î¸ï¿½ ï¿½Å¹ï¿½ Ã¼Å©ï¿½Ï±ï¿½ ï¿½ï¿½ï¿½ï¿½)
         ConsentInformation.Update(requestParams, OnConsentInfoUpdated);
     }
 
@@ -112,11 +112,11 @@ public class AdmobManager : SingletonInstance<AdmobManager>, IManager
     {
         if (updateError != null)
         {
-            LLogger.Log($"[UMP] µ¿ÀÇ Á¤º¸ °»½Å ½ÇÆÐ: {updateError}", LLogger.LogLevel.Warning);
+            LLogger.Log($"[UMP] ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½: {updateError}", LLogger.LogLevel.Warning);
             return;
         }
 
-        // ÇÊ¿äÇÑ °æ¿ì¿¡¸¸ ÀÚµ¿À¸·Î ÆûÀ» ¶ç¿öÁÜ (³»¿ëÀº 1´Ü°è¿¡¼­ ¸¸µç ¸Þ½ÃÁö ±×´ë·Î)
+        // ï¿½Ê¿ï¿½ï¿½ï¿½ ï¿½ï¿½ì¿¡ï¿½ï¿½ ï¿½Úµï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ (ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ 1ï¿½Ü°è¿¡ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½Þ½ï¿½ï¿½ï¿½ ï¿½×´ï¿½ï¿½)
         ConsentForm.LoadAndShowConsentFormIfRequired(OnConsentFormDismissed);
     }
     public void OnClickPrivacyOptionsButton()
@@ -131,12 +131,12 @@ public class AdmobManager : SingletonInstance<AdmobManager>, IManager
     {
         if (formError != null)
         {
-            LLogger.Log($"[UMP] µ¿ÀÇ Æû Ã³¸® Áß ¿À·ù: {formError}", LLogger.LogLevel.Warning);
+            LLogger.Log($"[UMP] ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ Ã³ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½: {formError}", LLogger.LogLevel.Warning);
         }
 
         if (ConsentInformation.CanRequestAds())
         {
-            // ¿©±â¼­ºÎÅÍ AdMob ¹è³Ê/Àü¸é ±¤°í ·Îµå ½ÃÀÛ
+            // ï¿½ï¿½ï¿½â¼­ï¿½ï¿½ï¿½ï¿½ AdMob ï¿½ï¿½ï¿½/ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½Îµï¿½ ï¿½ï¿½ï¿½ï¿½
             InitializeAndLoadAds();
         }
     }
