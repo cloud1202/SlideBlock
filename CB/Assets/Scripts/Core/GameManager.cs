@@ -1,9 +1,10 @@
 using Cysharp.Threading.Tasks;
+using System.Threading;
 using UnityEngine;
 using UnityEngine.InputSystem;
+using VContainer.Unity;
 
-[ManagerOrder(0)]
-public class GameManager : SingletonInstance<GameManager>, IManager
+public class GameManager : IAsyncStartable, System.IDisposable
 {
     public int HighScore
     {
@@ -36,6 +37,35 @@ public class GameManager : SingletonInstance<GameManager>, IManager
     private IBaseUI _lobbyUI;
     private IBaseUI _loadingUI;
 
+    private readonly LifetimeScope _rootScope;
+    private readonly AddressableManager _addressableManager;
+    private readonly PrefabManager _prefabManager;
+    private readonly SoundManager _soundManager;
+    private readonly TextDataManager _textDataManager;
+    private readonly InputManager _inputManager;
+    private readonly FirebaseManager _firebaseManager;
+    private readonly AdmobManager _admobManager;
+
+
+    public GameManager(
+        LifetimeScope rootScope,
+        AddressableManager addressableManager,
+        PrefabManager prefabManager,
+        SoundManager soundManager,
+        TextDataManager textDataManager,
+        InputManager inputManager,
+        FirebaseManager firebaseManager,
+        AdmobManager admobManager)
+    {
+        _rootScope = rootScope;
+        _addressableManager = addressableManager;
+        _prefabManager = prefabManager;
+        _soundManager = soundManager;
+        _textDataManager = textDataManager;
+        _inputManager = inputManager;
+        _firebaseManager = firebaseManager;
+        _admobManager = admobManager;
+    }
     async public UniTask Bootstrap()
     {
         ResolutionScreen.InitResolution();
@@ -99,5 +129,15 @@ public class GameManager : SingletonInstance<GameManager>, IManager
     private void OnApplicationQuit()
     {
         //FirebaseManager.Instance.SaveUserData();
+    }
+
+    public void Dispose()
+    {
+        throw new System.NotImplementedException();
+    }
+
+    public UniTask StartAsync(CancellationToken cancellation = default)
+    {
+        throw new System.NotImplementedException();
     }
 }

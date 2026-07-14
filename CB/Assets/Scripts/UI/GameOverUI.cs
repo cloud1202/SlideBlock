@@ -20,17 +20,17 @@ public class GameOverUI : BaseUI, IScore
 
     public void SetScore(int score)
     {
-        if (GameManager.Instance.HighScore < score)
-        {
-            UpdateHighScore(score);
-        }
+        //if (GameManager.Instance.HighScore < score)
+        //{
+        //    UpdateHighScore(score);
+        //}
         _score.text = Utility.NumberRegularExpression(score);
     }
 
     private void UpdateHighScore(int score)
     {
         SoundManager.Instance.PlaySFX(SoundData.Confetti).Forget();
-        GameManager.Instance.HighScore = score;
+       // GameManager.Instance.HighScore = score;
         _highScore.Burst();
         
         AdmobManager.Instance.CreateInterstitial(2f).Forget();
@@ -43,13 +43,13 @@ public class GameOverUI : BaseUI, IScore
 
     public void OnClickRetryBtn()
     {
-        GameManager.Instance.StartRound().Forget();
+        //GameManager.Instance.StartRound().Forget();
         OnClickCloseBtn();
     }
 
     public void OnClickHomeBtn()
     {
-        GameManager.Instance.ExitRound();
+        //GameManager.Instance.ExitRound();
         OnClickCloseBtn();
     }
 

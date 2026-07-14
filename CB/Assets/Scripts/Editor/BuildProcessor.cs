@@ -134,10 +134,10 @@ public static class BuildProcessor
         string fileName;
         if (EditorUserBuildSettings.buildAppBundle)
         {
-            fileName = $"SlideBlock_{version}.aab";
+            fileName = $"{PlayerSettings.productName}_{version}.aab";
         }
         else
-            fileName = $"SlideBlock_{version}_{_newSymbol}.apk";
+            fileName = $"{PlayerSettings.productName}_{version}_{_newSymbol}.apk";
 
         string outputPath = Path.Combine(buildDir, fileName);
 
