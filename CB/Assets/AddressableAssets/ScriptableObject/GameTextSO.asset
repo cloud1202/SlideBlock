@@ -79,3 +79,6 @@ MonoBehaviour:
   - id: 16
     text:
     - RANKING
+  - id: 17
+    text:
+    - A new update is available. Please update to the latest version to continue playing.
