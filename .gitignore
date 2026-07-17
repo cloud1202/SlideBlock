@@ -99,3 +99,6 @@ InitTestScene*.unity*
 **/[Aa]ssets/[Ii]nit[Tt]est[Ss]cene*.unity*
 CB/Assets/Firebase/Plugins/x86_64/FirebaseCppApp-13_12_0.bundle
 CB/Assets/Firebase/Plugins/x86_64/FirebaseCppApp-13_12_0.bundle.meta
+
+# Local git worktrees used for isolated feature work
+.worktrees/
