@@ -361,7 +361,9 @@ async public UniTask Bootstrap()
 
 - [ ] **Step 3: Play 모드 전체 흐름 재확인**
 
-  Task 4의 Step 4, Step 5를 다시 한번 처음부터(씬 재시작) 실행해서, 로비 UI가 실제로 강제 업데이트 상황에서는 아예 생성되지 않고(Console에 `LobbyUI` 관련 인스턴스화 로그가 안 뜸), 정상 버전에서는 기존과 동일하게 로비까지 도달하는지 최종 확인.
+  **주의 (최종 리뷰에서 바로잡음):** `ShowForceUpdatePopupAsync()`는 팝업을 띄우고 콜백을 등록한 뒤 바로 반환되므로(Yes를 눌렀을 때의 재표시는 `.Forget()`으로 fire-and-forget됨), `CheckForForceUpdateAsync()`도 곧 반환되고 `Bootstrap()`은 로비/로딩 UI 생성을 포함해 계속 진행된다. 즉 강제 업데이트 상황에서도 `LobbyUI` 인스턴스화 로그는 정상적으로 뜬다 — 이건 버그가 아니다. 강제성은 "Bootstrap이 멈춘다"가 아니라 "`PopupQuestionUI`가 `DynamicCanvas` 위에서 전체 화면을 덮고 입력을 막는다"는 방식으로 보장된다(기존에 이미 배포된 종료 확인 팝업과 동일한 메커니즘).
+
+  Task 4의 Step 4, Step 5를 다시 한번 처음부터(씬 재시작) 실행해서, 강제 업데이트 상황에서 팝업이 화면 전체를 덮어 로비를 가리고 입력을 막는지(로비 요소를 탭해도 반응하지 않는지) 확인하고, 정상 버전에서는 기존과 동일하게 로비까지 도달해 정상적으로 조작 가능한지 최종 확인.
 
 - [ ] **Step 4: 커밋**
 

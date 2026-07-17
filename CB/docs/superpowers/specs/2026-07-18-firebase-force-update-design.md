@@ -80,9 +80,10 @@ await FirebaseManager.Instance.CheckForForceUpdateAsync();
 
 이 시점을 고르는 이유:
 - `PrefabManager`, `TextDataManager`가 이미 로드되어 있어야 `InstantiateDynamicUI`와 `SetNoticeContent`(GameText 조회)가 정상 동작한다.
-- 강제 업데이트가 걸리는 경우, 로비/로딩 UI를 만드는 비용을 들이지 않고 바로 멈춘다.
 
-강제 업데이트 상황에서는 `ShowForceUpdatePopupAsync()`가 사실상 반환되지 않으므로(Yes를 눌러도 팝업이 재표시됨), `Bootstrap()`의 이후 단계(로비 UI 생성 등)는 실행되지 않는다.
+**중요 (최종 리뷰에서 바로잡음, 최초 설계 당시 잘못 기술됨):** `ShowForceUpdatePopupAsync()`는 팝업을 띄우고 콜백을 등록한 뒤 곧바로 반환된다 (Yes를 눌렀을 때의 재표시는 `.Forget()`으로 fire-and-forget되므로 원래 호출의 대기 상태를 유지하지 않는다). 즉 `CheckForForceUpdateAsync()`도 곧 반환되고, `GameManager.Bootstrap()`은 로비/로딩 UI 생성 등 이후 단계를 그대로 계속 진행한다 — **Bootstrap 자체가 멈추지는 않는다.**
+
+강제성은 "Bootstrap이 멈춘다"가 아니라 "`PopupQuestionUI`가 `DynamicCanvas`(전체 화면, 레이캐스트 차단) 위에 떠서 그 아래에서 계속 진행 중인 로비를 가리고 입력을 막는다"는 방식으로 보장된다. 이는 이미 이 게임에 배포되어 있는 기존 종료 확인 팝업(`GameManager.ShowExitToast`)과 완전히 동일한 메커니즘(`InstantiateDynamicUI<IPopupQuestion>(PrefabData.PopupQuestionUI)`)이라, 검증된 패턴이다. Bootstrap을 실제로 멈추려면 `UniTask.Never`처럼 절대 완료되지 않는 대기를 넣어야 하는데, 이는 `_loadingUI` 정리 등 이후 로직을 영구히 막아버리는 부작용이 있어 채택하지 않는다.
 
 ## 데이터 / 텍스트
 
