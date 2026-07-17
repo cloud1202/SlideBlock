@@ -36,13 +36,20 @@ public class GameManager : SingletonInstance<GameManager>, IManager
     private IBaseUI _lobbyUI;
     private IBaseUI _loadingUI;
 
+    public float catureEnterTime { get; set; }
     async public UniTask Bootstrap()
     {
         ResolutionScreen.InitResolution();
+        await UniTask.WaitUntil(() => FirebaseManager.Instance.IsInitialized);
+        FirebaseManager.Instance.Log("AddressableManager Init");
         await AddressableManager.Instance.SetAddressable();
+        FirebaseManager.Instance.Log("PrefabManager Init");
         await PrefabManager.Instance.LoadAssetReference();
+        FirebaseManager.Instance.Log("SoundManager Init");
         await SoundManager.Instance.LoadAssetReference();
+        FirebaseManager.Instance.Log("TextDataManager Init");
         await TextDataManager.Instance.LoadAssetReference();
+        FirebaseManager.Instance.Log("PrefabManager Load");
         await PrefabManager.Instance.InitLoadObjects();
         _lobbyUI = await PrefabManager.Instance.InstantiateStaticUI<IBaseUI>(PrefabData.LobbyUI);
         _loadingUI = await PrefabManager.Instance.InstantiateStaticUI<IBaseUI>(PrefabData.LoadingUI);
@@ -85,19 +92,32 @@ public class GameManager : SingletonInstance<GameManager>, IManager
         var popup = await PrefabManager.Instance.InstantiateDynamicUI<IPopupQuestion>(PrefabData.PopupQuestionUI);
 
         popup.SetNoticeContent(GameTextData.POPUP_EXIT_GAME);
-        popup.RegistQuestionAction(() => Application.Quit());
+        popup.RegistQuestionAction(QuitGame);
         
+    }
+
+    private void QuitGame()
+    {
+        ExitRound();
+        Application.Quit();
     }
 
     private void OnApplicationPause(bool pause)
     {
-        //if (pause)
-        //    FirebaseManager.Instance.SaveUserData();
-        //
+        if (!pause)
+            return;
+
+        PlayerPrefs.Save();
+
+        if (_roundManager != null)
+            FirebaseManager.Instance.LogModePause("Classic", Time.realtimeSinceStartup - catureEnterTime, _roundManager.CurrentScore);
+
+        FirebaseManager.Instance.Log("App paused");
     }
 
     private void OnApplicationQuit()
     {
-        //FirebaseManager.Instance.SaveUserData();
+        PlayerPrefs.Save();
+        FirebaseManager.Instance.LogEvent("app_quit","real_time", Time.realtimeSinceStartup.ToString());
     }
 }

@@ -32,6 +32,9 @@ public class FirebaseManager : SingletonInstance<FirebaseManager>, IManager
     private const int MIN_INTERVAL_SECONDS = 60; // 스팸 방지: 최소 발송 간격
 
     private DateTime _lastSentTimeUtc = DateTime.MinValue;
+
+
+    private UniTaskCompletionSource<bool> _authTcs;
     /// <summary>
     /// 닉네임 설정용 캐시. 랭킹 기록 시 같이 올라감. SetNickname()으로 변경 가능.
     /// </summary>
@@ -48,6 +51,7 @@ public class FirebaseManager : SingletonInstance<FirebaseManager>, IManager
             _user.ClassicScore = value;
             _user.IsDirty = true;
             SaveUserData();
+            TryReportLeaderboard().Forget();
         }
     }
     public bool IsBGMOn
@@ -59,6 +63,7 @@ public class FirebaseManager : SingletonInstance<FirebaseManager>, IManager
         set
         {
             PlayerPrefs.SetInt(SaveFieldData.Fields[EnumConverter.Enum32ToInt(SaveFieldType.IsBGMOn)], value.GetHashCode());
+            if (!value) LogEvent("bgm_off");
             _user.IsBGMOn = value;
             _user.IsDirty = true;
             SaveUserData();
@@ -73,6 +78,7 @@ public class FirebaseManager : SingletonInstance<FirebaseManager>, IManager
         set
         {
             PlayerPrefs.SetInt(SaveFieldData.Fields[EnumConverter.Enum32ToInt(SaveFieldType.IsSFXOn)], value.GetHashCode());
+            if (!value) LogEvent("sfx_off");
             _user.IsSFXOn = value;
             _user.IsDirty = true;
             SaveUserData();
@@ -88,6 +94,8 @@ public class FirebaseManager : SingletonInstance<FirebaseManager>, IManager
         set
         {
             PlayerPrefs.SetInt(SaveFieldData.Fields[EnumConverter.Enum32ToInt(SaveFieldType.IsSymbolOn)], value.GetHashCode());
+
+            if (value) LogEvent("symbol_on");
             _user.IsSymbolOn = value;
             _user.IsDirty = true;
             SaveUserData();
@@ -117,12 +125,12 @@ public class FirebaseManager : SingletonInstance<FirebaseManager>, IManager
                 return;
             }
             _firestore = FirebaseFirestore.DefaultInstance;
-            IsInitialized = true;
             Logging("Firebase 초기화 완료");
 
             InitCrashlytics();
             //InitMessaging();
             SignInAuth();
+            IsInitialized = true;
         });
     }
 
@@ -161,13 +169,15 @@ public class FirebaseManager : SingletonInstance<FirebaseManager>, IManager
             return;
 
     }
-    
-    public void ManuallyAuthentication()
+
+    public UniTask<bool> ManuallyAuthenticationAsync()
     {
         if (PlayGamesPlatform.Instance.IsAuthenticated())
-            return;
+            return UniTask.FromResult(true);
 
+        _authTcs = new UniTaskCompletionSource<bool>();
         PlayGamesPlatform.Instance.ManuallyAuthenticate(ProcessAuthentication);
+        return _authTcs.Task;
     }
 
     private bool TryPlayGamesAuthentication()
@@ -178,9 +188,10 @@ public class FirebaseManager : SingletonInstance<FirebaseManager>, IManager
             PlayGamesPlatform.Instance.Authenticate(ProcessAuthentication);
             return PlayGamesPlatform.Instance.IsAuthenticated();
         }
-        catch (Exception ex)
+        catch (Exception e)
         {
-            Logging(ex.ToString());
+            LogError(e);
+            Logging(e.ToString());
             return false;
         }
     }
@@ -218,11 +229,13 @@ public class FirebaseManager : SingletonInstance<FirebaseManager>, IManager
     {
         if (task.IsCanceled)
         {
+            _authTcs?.TrySetResult(false);
             Error("SignInAndRetrieveDataWithCredentialAsync was canceled.");
             return;
         }
         if (task.IsFaulted)
         {
+            _authTcs?.TrySetResult(false);
             Error("SignInAndRetrieveDataWithCredentialAsync encountered an error: " + task.Exception);
             return;
         }
@@ -236,6 +249,8 @@ public class FirebaseManager : SingletonInstance<FirebaseManager>, IManager
         AuthResult result = task.Result;
         UserId = result.User.UserId;
         Crashlytics.SetUserId(UserId);
+
+        _authTcs?.TrySetResult(!string.IsNullOrEmpty(Nickname));
         LoadUserData().Forget();
         Logging($"User signed in successfully: {result.User.DisplayName} ({result.User.UserId})");
     }
@@ -292,6 +307,7 @@ public class FirebaseManager : SingletonInstance<FirebaseManager>, IManager
         }
         catch(Exception e)
         {
+            LogError(e);
             Error(e.ToString());
         }
     }
@@ -334,14 +350,24 @@ public class FirebaseManager : SingletonInstance<FirebaseManager>, IManager
             new Parameter("score", currentScore));
     }
 
+    public void LogModePause(string mode, float playDurationSec, int currentScore)
+    {
+        FirebaseAnalytics.LogEvent("game_pause",
+            new Parameter("mode", mode),
+            new Parameter("play_duration_sec", playDurationSec),
+            new Parameter("score", currentScore));
+    }
+
     /// <summary>
     /// 정상적으로 게임오버 화면까지 도달했을 때.
     /// </summary>
-    public void LogGameOver(string mode, int finalScore)
+    public void LogGameOver(string mode, int finalScore, int maxCombo)
     {
         FirebaseAnalytics.LogEvent("game_over",
             new Parameter("mode", mode),
-            new Parameter("final_score", finalScore));
+            new Parameter("final_score", finalScore),
+            new Parameter("max_combo", maxCombo)
+            );
     }
 
     #endregion
@@ -351,6 +377,11 @@ public class FirebaseManager : SingletonInstance<FirebaseManager>, IManager
     private void InitCrashlytics()
     {
         Crashlytics.ReportUncaughtExceptionsAsFatal = true;
+#if DEVELOP
+    Crashlytics.SetCustomKey("build_type", "DEVELOP");
+#else
+        Crashlytics.SetCustomKey("build_type", "RELEASE");
+#endif
     }
 
     public void Log(string message)
@@ -358,16 +389,15 @@ public class FirebaseManager : SingletonInstance<FirebaseManager>, IManager
         Crashlytics.Log(message);
     }
 
+    public void LogError(Exception e)
+    {
+        Crashlytics.LogException(e);
+    }
+
     public void SetCustomKey(string key, string value)
     {
         Crashlytics.SetCustomKey(key, value);
     }
-
-    public void SetCustomKey(string key, int value)
-    {
-        Crashlytics.SetCustomKey(key, value.ToString());
-    }
-
     #endregion
 
     #region Messaging (FCM)
@@ -395,6 +425,37 @@ public class FirebaseManager : SingletonInstance<FirebaseManager>, IManager
         //FirebaseMessaging.MessageReceived -= OnMessageReceived;
     }
 
+    #endregion
+    #region PlayGames
+    public async UniTask<bool> IsAuthenticated()
+    {
+        if (!PlayGamesPlatform.Instance.IsAuthenticated())
+        {
+            bool success = await ManuallyAuthenticationAsync();
+            if (!success)
+            {
+                Warning("인증 실패");
+                return false;
+            }
+        }
+        return true;
+    }
+    private async UniTask TryReportLeaderboard()
+    {
+        if(await IsAuthenticated())
+            PlayGamesPlatform.Instance.ReportScore(ClassicScore, GPGSIds.leaderboard_high_score, ResultReportLeaderboard);
+    }
+
+    private void ResultReportLeaderboard(bool isComplete)
+    {
+        LogEvent("report_leaderboard", "is_complete", isComplete.ToString());
+    }
+
+    public async UniTask ShowLeaderboardUI()
+    {
+        if (await IsAuthenticated())
+            PlayGamesPlatform.Instance.ShowLeaderboardUI(GPGSIds.leaderboard_high_score);
+    }
     #endregion
 
     #region Public API
@@ -446,6 +507,7 @@ public class FirebaseManager : SingletonInstance<FirebaseManager>, IManager
         }
         catch (Exception e)
         {
+            LogError(e);
             Debug.LogError($"[InquiryManager] 문의 전송 실패: {e}");
             return InquiryResult.Fail(GameTextData.INQURIY_SEND_FAIL_4);
         }

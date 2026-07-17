@@ -12,23 +12,23 @@ public class AdmobManager : SingletonInstance<AdmobManager>, IManager
     public override void Init()
     {
         base.Init();
-        Logging("Admob �ʱ�ȭ ����");
+        Logging("Admob 초기화");
 
         RequestConsent();
     }
 
     private void InitializeAndLoadAds()
     {
-        // Google Mobile Ads SDK �ʱ�ȭ
         MobileAds.Initialize(initStatus =>
         {
-            Logging("Admob �ʱ�ȭ �Ϸ�");
+            Logging("Admob 초기화 완료");
             CreateBanner();
         });
     }
 
     private void CreateBanner()
     {
+        FirebaseManager.Instance.Log("Bottom Admob Banner Create");
 #if UNITY_EDITOR
         string adUnitId = "ca-app-pub-3940256099942544/6300978111";
 
@@ -40,11 +40,11 @@ public class AdmobManager : SingletonInstance<AdmobManager>, IManager
 
         AdRequest request = new AdRequest();
         bannerView.LoadAd(request);
-
     }
 
     async public UniTask CreateInterstitial(float delay = 0f)
     {
+        FirebaseManager.Instance.Log("Update High Score Admob Create");
         await UniTask.WaitForSeconds(delay);
         var adRequest = new AdRequest();
 #if UNITY_EDITOR

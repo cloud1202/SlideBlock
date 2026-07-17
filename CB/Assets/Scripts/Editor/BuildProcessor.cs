@@ -19,6 +19,7 @@ public static class BuildProcessor
 
     // 빌드 옵션
     private static bool _autoIncrementPatch = true;
+    private static bool _autoBundleInc = true;
 
     private static bool _isJenkins = false;
 
@@ -34,14 +35,32 @@ public static class BuildProcessor
         EditorUserBuildSettings.development = true;
         EditorUserBuildSettings.buildAppBundle = false;
         _autoIncrementPatch = false;
+        _autoBundleInc = false;
 
         BuildOptions options = BuildOptions.Development | BuildOptions.AllowDebugging;
 
         Build(BuildTarget.Android, options);
     }
 
-    [MenuItem("Build/BuildAndroid_Test_Release")]
-    public static void BuildAndroid_Test_Release()
+    [MenuItem("Build/BuildAndroid_Release_APK")]
+    public static void BuildAndroid_Release_APK()
+    {
+        string[] args = Environment.GetCommandLineArgs();
+        _isJenkins = args.Length > 0;
+        _newSymbol = "RELEASE";
+        PlayerSettings.SetScriptingDefineSymbols(NamedBuildTarget.Android, _newSymbol);
+        AutoKeystoreFile.ApplyFromDefaultPath();
+        EditorUserBuildSettings.development = false;
+        EditorUserBuildSettings.buildAppBundle = false;
+        _autoIncrementPatch = false;
+        _autoBundleInc = false;
+
+        BuildOptions options = BuildOptions.None;
+        Build(BuildTarget.Android, options);
+    }
+
+    [MenuItem("Build/BuildAndroid_Release_Test")]
+    public static void BuildAndroid_Release_Test()
     {
         string[] args = Environment.GetCommandLineArgs();
         _isJenkins = args.Length > 0;
@@ -51,6 +70,7 @@ public static class BuildProcessor
         EditorUserBuildSettings.development = false;
         EditorUserBuildSettings.buildAppBundle = true;
         _autoIncrementPatch = false;
+        _autoBundleInc = true;
 
         BuildOptions options = BuildOptions.None;
         Build(BuildTarget.Android, options);
@@ -68,6 +88,7 @@ public static class BuildProcessor
         EditorUserBuildSettings.development = false;
         EditorUserBuildSettings.buildAppBundle = true;
         _autoIncrementPatch = true;
+        _autoBundleInc = true;
 
         BuildOptions options = BuildOptions.None;
         Build(BuildTarget.Android, options);
@@ -84,47 +105,12 @@ public static class BuildProcessor
             int.TryParse(parts[2], out _patch);
         }
     }
-
-    //private static void RefreshSymbols()
-    //{
-    //    string raw = PlayerSettings.GetScriptingDefineSymbols(NamedBuildTarget.Android);
-    //    _currentSymbols = string.IsNullOrEmpty(raw)
-    //        ? Array.Empty<string>()
-    //        : raw.Split(';').Where(s => !string.IsNullOrWhiteSpace(s)).ToArray();
-    //}
-
-    //private static void AddSymbol(string symbol)
-    //{
-    //    if (string.IsNullOrEmpty(symbol)) return;
-    //    if (_currentSymbols.Contains(symbol)) return;
-
-    //    var list = _currentSymbols.ToList();
-    //    list.Add(symbol);
-    //    ApplySymbols(list.ToArray());
-    //}
-
-    //private static void RemoveSymbol(string symbol)
-    //{
-    //    var list = _currentSymbols.Where(s => s != symbol).ToArray();
-    //    ApplySymbols(list);
-    //}
-
-    //private static void ApplySymbols(string[] symbols)
-    //{
-    //    string joined = string.Join(";", symbols);
-    //    PlayerSettings.SetScriptingDefineSymbols(NamedBuildTarget.Android, joined);
-    //    RefreshSymbols();
-    //}
-
     public static void Build(BuildTarget buildTarget, BuildOptions buildOptions)
     {
         LoadData();
         // Patch 자동 증가
-        if (_autoIncrementPatch)
-        {
-            _patch++;
-            PlayerSettings.Android.bundleVersionCode++;
-        }
+        if (_autoIncrementPatch) _patch++;
+        if (_autoBundleInc) PlayerSettings.Android.bundleVersionCode++;
 
         string version = $"{_major}.{_minor}.{_patch}";
         PlayerSettings.bundleVersion = version;
@@ -166,6 +152,7 @@ public static class BuildProcessor
             }
 
             Debug.Log($"Build Success: {outputPath}");
+            if (!_isJenkins) EditorUtility.RevealInFinder(buildDir);
         }
         catch (Exception e)
         {
