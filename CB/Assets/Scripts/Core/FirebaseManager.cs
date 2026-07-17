@@ -6,6 +6,7 @@ using Firebase.Crashlytics;
 using Firebase.Extensions;
 using Firebase.Firestore;
 using Firebase.Messaging;
+using Firebase.RemoteConfig;
 using GooglePlayGames;
 using GooglePlayGames.BasicApi;
 using System;
@@ -456,6 +457,59 @@ public class FirebaseManager : SingletonInstance<FirebaseManager>, IManager
         if (await IsAuthenticated())
             PlayGamesPlatform.Instance.ShowLeaderboardUI(GPGSIds.leaderboard_high_score);
     }
+    #endregion
+
+    #region RemoteConfig
+
+    private const string MIN_VERSION_KEY = "min_required_version";
+    private const string PLAY_STORE_URL = "https://play.google.com/store/apps/details?id=com.LayonStudio.SlideBlock";
+
+    public async UniTask CheckForForceUpdateAsync()
+    {
+        try
+        {
+            var remoteConfig = FirebaseRemoteConfig.DefaultInstance;
+            await remoteConfig.SetDefaultsAsync(new System.Collections.Generic.Dictionary<string, object>
+            {
+                { MIN_VERSION_KEY, "0.0.0" }
+            }).AsUniTask();
+
+            await remoteConfig.FetchAndActivateAsync().AsUniTask();
+
+            var minVersion = new Version(remoteConfig.GetValue(MIN_VERSION_KEY).StringValue);
+            var currentVersion = new Version(Application.version);
+
+            if (currentVersion < minVersion)
+            {
+                Logging($"강제 업데이트 필요: 현재 {currentVersion} < 최소 {minVersion}");
+                await ShowForceUpdatePopupAsync();
+            }
+        }
+        catch (Exception e)
+        {
+            LogError(e);
+            Warning($"강제 업데이트 체크 실패, 통과 처리: {e}");
+        }
+    }
+
+    private async UniTask ShowForceUpdatePopupAsync()
+    {
+        // OnClickYesBtn -> base.Close()가 같은 프레임에 실행되므로, 재호출 시 팝업을
+        // 재활성화하기 전에 Close()가 먼저 끝나도록 한 프레임 대기한다.
+        await UniTask.Yield();
+
+        var popup = await PrefabManager.Instance.InstantiateDynamicUI<IPopupQuestion>(PrefabData.PopupQuestionUI);
+        popup.SetNoticeContent(GameTextData.POPUP_UPDATE_REQUIRED);
+        popup.RegistQuestionAction(
+            onClickYesAction: () =>
+            {
+                Application.OpenURL(PLAY_STORE_URL);
+                ShowForceUpdatePopupAsync().Forget();
+            },
+            onClickNoAction: Application.Quit
+        );
+    }
+
     #endregion
 
     #region Public API
