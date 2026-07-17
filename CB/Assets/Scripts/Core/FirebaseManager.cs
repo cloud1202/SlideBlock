@@ -492,6 +492,12 @@ public class FirebaseManager : SingletonInstance<FirebaseManager>, IManager
         }
     }
 
+    // 이 메서드는 팝업을 띄우고 콜백을 등록하면 바로 반환된다 (유저의 선택을 기다리지 않음).
+    // 즉 CheckForForceUpdateAsync()도 곧 반환되고 Bootstrap()은 로비 UI 생성 등을 계속 진행한다.
+    // 강제성은 Bootstrap을 멈추는 게 아니라, PopupQuestionUI가 DynamicCanvas 위에서 전체 화면을
+    // 덮어 입력을 막는 것으로 보장된다 (기존 종료 확인 팝업과 동일한 메커니즘). 여기서 실제로
+    // 블로킹하려고 대기를 추가하지 말 것 — Bootstrap의 나머지 단계(_loadingUI.Close() 등)가
+    // 영원히 실행되지 않게 된다.
     private async UniTask ShowForceUpdatePopupAsync()
     {
         // OnClickYesBtn -> base.Close()가 같은 프레임에 실행되므로, 재호출 시 팝업을
