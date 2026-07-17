@@ -51,6 +51,8 @@ public class GameManager : SingletonInstance<GameManager>, IManager
         await TextDataManager.Instance.LoadAssetReference();
         FirebaseManager.Instance.Log("PrefabManager Load");
         await PrefabManager.Instance.InitLoadObjects();
+        FirebaseManager.Instance.Log("Force Update Check");
+        await FirebaseManager.Instance.CheckForForceUpdateAsync();
         _lobbyUI = await PrefabManager.Instance.InstantiateStaticUI<IBaseUI>(PrefabData.LobbyUI);
         _loadingUI = await PrefabManager.Instance.InstantiateStaticUI<IBaseUI>(PrefabData.LoadingUI);
         _lobbyUI.Init();
