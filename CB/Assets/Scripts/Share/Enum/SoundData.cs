@@ -9,4 +9,5 @@ public enum SoundData
     Click = 100,
     Match,
     Confetti,
+    Slide,
 }
