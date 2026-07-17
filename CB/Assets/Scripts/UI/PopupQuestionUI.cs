@@ -27,16 +27,16 @@ public class PopupQuestionUI : BaseUI, IPopupQuestion
 
     public void OnClickCloseBtn()
     {
+        _onClickNo?.Invoke();
         base.Close();
     }
     public void OnClickYesBtn()
     {
         _onClickYes?.Invoke();
-        OnClickCloseBtn();
+        base.Close();
     }
     public void OnClickNoBtn()
     {
-        _onClickNo?.Invoke();
         OnClickCloseBtn();
     }
 }
