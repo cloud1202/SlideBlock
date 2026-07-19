@@ -23,6 +23,7 @@ public class PopupQuestionUI : BaseUI, IPopupQuestion
     {
         InputManager.Instance.UnsubscribeToInputHandler(InputType.Game_Exit, OnClickBackKey);
         base.Close();
+        Destroy(this.gameObject);
     }
 
     public void SetNoticeContent(GameTextData content)
