@@ -120,7 +120,7 @@ public class FirebaseManager : SingletonInstance<FirebaseManager>, IManager
 
     private void InitializeFirebase()
     {
-#if UNITY_ANDROID || UNITY_EDITOR
+#if UNITY_ANDROID
         FirebaseApp.CheckAndFixDependenciesAsync().ContinueWithOnMainThread(task =>
         {
             var status = task.Result;
@@ -148,7 +148,7 @@ public class FirebaseManager : SingletonInstance<FirebaseManager>, IManager
 
     #region Authentication
 
-#if UNITY_ANDROID || UNITY_EDITOR
+#if UNITY_ANDROID
     private void SignInAuth()
     {
         FirebaseAuth auth = FirebaseAuth.DefaultInstance;
@@ -492,7 +492,7 @@ public class FirebaseManager : SingletonInstance<FirebaseManager>, IManager
     #endregion
 #endif
     #region PlayGames
-#if UNITY_ANDROID || UNITY_EDITOR
+#if UNITY_ANDROID
     public async UniTask<bool> IsAuthenticated()
     {
         if (!PlayGamesPlatform.Instance.IsAuthenticated())
