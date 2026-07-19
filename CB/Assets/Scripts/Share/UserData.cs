@@ -1,7 +1,11 @@
+#if UNITY_ANDROID || UNITY_EDITOR
 using Firebase.Firestore;
+#endif
 using UnityEngine;
 
+#if UNITY_ANDROID || UNITY_EDITOR
 [FirestoreData]
+#endif
 public class UserData
 {
     public UserData()
@@ -12,10 +16,13 @@ public class UserData
         IsSymbolOn = PlayerPrefs.GetInt(SaveFieldData.Fields[EnumConverter.Enum32ToInt(SaveFieldType.IsSymbolOn)], 1) > 0 ? true : false;
     }
 
-    // DB « µÂ∏Ì: "high_score" °Ê C# «¡∑Œ∆€∆º∏Ì: HighScore
+    // DB ÌïÑÎìúÎ™Ö: "high_score" ‚Üî C# ÌîÑÎ°úÌçºÌã∞Î™Ö: HighScore
+#if UNITY_ANDROID || UNITY_EDITOR
     [FirestoreProperty("HighScore_Classic")]
+#endif
     public int ClassicScore { get; set; } = 0;
 
+#if UNITY_ANDROID || UNITY_EDITOR
     [FirestoreProperty("lastPlayedAt")]
     public Timestamp LastPlayed { get; set; }
 
@@ -23,12 +30,17 @@ public class UserData
     public Timestamp CreatedAt { get; set; }
 
     [FirestoreProperty("IsBGMOn")]
+#endif
     public bool IsBGMOn { get; set; } = true;
 
+#if UNITY_ANDROID || UNITY_EDITOR
     [FirestoreProperty("IsSFXOn")]
+#endif
     public bool IsSFXOn { get; set; } = true;
 
+#if UNITY_ANDROID || UNITY_EDITOR
     [FirestoreProperty("IsSymbolOn")]
-    public bool IsSymbolOn { get; set; } = true;
+#endif
+    public bool IsSymbolOn { get; set; } = false;
     public bool IsDirty { get; set; } = false;
 }

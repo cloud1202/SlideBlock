@@ -32,8 +32,10 @@ public class GameOverUI : BaseUI, IScore
         SoundManager.Instance.PlaySFX(SoundData.Confetti).Forget();
         GameManager.Instance.HighScore = score;
         _highScore.Burst();
-        
+
+#if UNITY_ANDROID || UNITY_EDITOR
         AdmobManager.Instance.CreateInterstitial(2f).Forget();
+#endif
     }
 
     public void UpdateCombo(int combo, Vector2 boundCenter)

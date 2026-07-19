@@ -2,7 +2,10 @@
     "name": "Firebase.App.Internal",
     "rootNamespace": "Firebase.Internal",
     "references": [],
-    "includePlatforms": [],
+    "includePlatforms": [
+        "Android",
+        "Editor"
+    ],
     "excludePlatforms": [],
     "allowUnsafeCode": false,
     "overrideReferences": true,

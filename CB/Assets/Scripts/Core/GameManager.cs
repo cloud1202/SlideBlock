@@ -37,9 +37,11 @@ public class GameManager : SingletonInstance<GameManager>, IManager
     private IBaseUI _loadingUI;
 
     public float catureEnterTime { get; set; }
+
     async public UniTask Bootstrap()
     {
         ResolutionScreen.InitResolution();
+        InputManager.Instance.SubscribeToInputHandler(InputType.Game_Exit, OnClickExit);
         await UniTask.WaitUntil(() => FirebaseManager.Instance.IsInitialized);
         FirebaseManager.Instance.Log("AddressableManager Init");
         await AddressableManager.Instance.SetAddressable();
@@ -53,11 +55,11 @@ public class GameManager : SingletonInstance<GameManager>, IManager
         await PrefabManager.Instance.InitLoadObjects();
         FirebaseManager.Instance.Log("Force Update Check");
         await FirebaseManager.Instance.CheckForForceUpdateAsync();
+        await UniTask.WaitUntil(() => FirebaseManager.Instance?.IsUpdate ?? false);
         _lobbyUI = await PrefabManager.Instance.InstantiateStaticUI<IBaseUI>(PrefabData.LobbyUI);
         _loadingUI = await PrefabManager.Instance.InstantiateStaticUI<IBaseUI>(PrefabData.LoadingUI);
         _lobbyUI.Init();
         _loadingUI.Init();
-        InputManager.Instance.SubscribeToInputHandler(InputType.Game_Exit, OnClickExit);
         await UniTask.WaitUntil(() => FirebaseManager.Instance.IsLoadData);
         await UniTask.WaitForSeconds(2f);
         _loadingUI.Close();
@@ -91,11 +93,15 @@ public class GameManager : SingletonInstance<GameManager>, IManager
 
     async private UniTask ShowExitToast()
     {
-        var popup = await PrefabManager.Instance.InstantiateDynamicUI<IPopupQuestion>(PrefabData.PopupQuestionUI);
+#if UNITY_ANDROID || UNITY_EDITOR
+        if (PrefabManager.Instance.TryGetInstance<IPopupQuestion>(PrefabData.PopupQuestionUI, out IPopupQuestion popup))
+            return;
+        popup = await PrefabManager.Instance.InstantiateDynamicUI<IPopupQuestion>(PrefabData.PopupQuestionUI);
 
         popup.SetNoticeContent(GameTextData.POPUP_EXIT_GAME);
         popup.RegistQuestionAction(QuitGame);
-        
+#endif
+
     }
 
     private void QuitGame()

@@ -1,4 +1,5 @@
 using Cysharp.Threading.Tasks;
+#if UNITY_ANDROID || UNITY_EDITOR
 using Firebase;
 using Firebase.Analytics;
 using Firebase.Auth;
@@ -9,25 +10,30 @@ using Firebase.Messaging;
 using Firebase.RemoteConfig;
 using GooglePlayGames;
 using GooglePlayGames.BasicApi;
+#endif
 using System;
 using System.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.SocialPlatforms;
 
-/// <summary>
-/// Firebase 전 기능(Auth, Firestore, Analytics, Crashlytics, Messaging)을 한 곳에서 관리하는 매니저.
-/// Bootstrap의 리플렉션 기반 매니저 로더에 의해 자동으로 생성/초기화됨.
-/// 초기화 순서: CheckAndFixDependencies -> 익명 로그인 -> FCM 토큰 등록 -> 유저 데이터 로드
-/// </summary>
 [ManagerOrder(1)]
 public class FirebaseManager : SingletonInstance<FirebaseManager>, IManager
 {
     public bool IsInitialized { get; private set; }
+#if UNITY_ANDROID || UNITY_EDITOR
+    public bool IsUpdate { get; private set; } = false;
+#else
+    public bool IsUpdate { get; private set; } = true;
+#endif
+    public bool IsLoadData => _user != null;
+    private UserData _user = null;
+
     public string UserId { get; private set; }
 
+#if UNITY_ANDROID || UNITY_EDITOR
     private FirebaseFirestore _firestore;
+#endif
     private const string USERS_COLLECTION = "users";
-    private const string LEADERBOARD_COLLECTION = "leaderboard"; 
     private const string MAIL_COLLECTION = "mail";
     private const string RECEIVER_EMAIL = "oortcloud98@gmail.com";
     private const int MIN_INTERVAL_SECONDS = 60; // 스팸 방지: 최소 발송 간격
@@ -103,9 +109,6 @@ public class FirebaseManager : SingletonInstance<FirebaseManager>, IManager
         }
     }
 
-    private UserData _user= null;
-
-    public bool IsLoadData => _user != null;
 
     public override void Init()
     {
@@ -117,6 +120,7 @@ public class FirebaseManager : SingletonInstance<FirebaseManager>, IManager
 
     private void InitializeFirebase()
     {
+#if UNITY_ANDROID || UNITY_EDITOR
         FirebaseApp.CheckAndFixDependenciesAsync().ContinueWithOnMainThread(task =>
         {
             var status = task.Result;
@@ -133,12 +137,18 @@ public class FirebaseManager : SingletonInstance<FirebaseManager>, IManager
             SignInAuth();
             IsInitialized = true;
         });
+#else
+        _user = new UserData();
+        Logging("WebGL: PlayerPrefs 기반 로컬 데이터로 초기화");
+        IsInitialized = true;
+#endif
     }
 
     #endregion
 
     #region Authentication
 
+#if UNITY_ANDROID || UNITY_EDITOR
     private void SignInAuth()
     {
         FirebaseAuth auth = FirebaseAuth.DefaultInstance;
@@ -168,7 +178,6 @@ public class FirebaseManager : SingletonInstance<FirebaseManager>, IManager
 
         if (TryPlayGamesAuthentication())
             return;
-
     }
 
     public UniTask<bool> ManuallyAuthenticationAsync()
@@ -213,7 +222,7 @@ public class FirebaseManager : SingletonInstance<FirebaseManager>, IManager
                 });
 
             Nickname = PlayGamesPlatform.Instance.localUser.userName;
-            
+
         }
         else
         {
@@ -255,16 +264,18 @@ public class FirebaseManager : SingletonInstance<FirebaseManager>, IManager
         LoadUserData().Forget();
         Logging($"User signed in successfully: {result.User.DisplayName} ({result.User.UserId})");
     }
+#endif
 
-    #endregion
+#endregion
 
     #region Firestore
     /// <summary>
     /// 유저 문서 한 필드만 병합 저장. 예: SaveField("highScore_classic", 15200)
     /// </summary>
-    
+
     public void SaveUserData()
     {
+#if UNITY_ANDROID || UNITY_EDITOR
         PlayerPrefs.Save();
         if (!IsInitialized || string.IsNullOrEmpty(UserId) || !IsLoadData)
         {
@@ -281,8 +292,12 @@ public class FirebaseManager : SingletonInstance<FirebaseManager>, IManager
 
             _user.IsDirty = false;
         });
+#else
+        PlayerPrefs.Save();
+#endif
     }
 
+#if UNITY_ANDROID || UNITY_EDITOR
     async private UniTask LoadUserData()
     {
         Logging("유저 데이터 로드 시작");
@@ -312,11 +327,13 @@ public class FirebaseManager : SingletonInstance<FirebaseManager>, IManager
             Error(e.ToString());
         }
     }
+#endif
 
     #endregion
 
     #region Analytics
 
+#if UNITY_ANDROID || UNITY_EDITOR
     public void LogEvent(string eventName)
     {
         FirebaseAnalytics.LogEvent(eventName);
@@ -331,13 +348,28 @@ public class FirebaseManager : SingletonInstance<FirebaseManager>, IManager
     {
         FirebaseAnalytics.LogEvent(eventName, parameters);
     }
+#else
+    public void LogEvent(string eventName)
+    {
+        WebAnalyticsBridge.LogEvent(eventName);
+    }
+
+    public void LogEvent(string eventName, string paramName, string paramValue)
+    {
+        WebAnalyticsBridge.LogEvent(eventName, paramName, paramValue);
+    }
+#endif
 
     /// <summary>
     /// 모드 시작 이벤트. 예: LogModeStart("classic")
     /// </summary>
     public void LogModeStart(string mode)
     {
-        FirebaseAnalytics.LogEvent("game_start", new Parameter("mode", mode));
+#if UNITY_ANDROID || UNITY_EDITOR
+        LogEvent("game_start", new Parameter("mode", mode));
+#else
+        WebAnalyticsBridge.LogModeStart(mode);
+#endif
     }
 
     /// <summary>
@@ -345,18 +377,26 @@ public class FirebaseManager : SingletonInstance<FirebaseManager>, IManager
     /// </summary>
     public void LogModeQuit(string mode, float playDurationSec, int currentScore)
     {
-        FirebaseAnalytics.LogEvent("game_quit",
+#if UNITY_ANDROID || UNITY_EDITOR
+        LogEvent("game_quit",
             new Parameter("mode", mode),
             new Parameter("play_duration_sec", playDurationSec),
             new Parameter("score", currentScore));
+#else
+        WebAnalyticsBridge.LogModeQuit(mode, playDurationSec, currentScore);
+#endif
     }
 
     public void LogModePause(string mode, float playDurationSec, int currentScore)
     {
-        FirebaseAnalytics.LogEvent("game_pause",
+#if UNITY_ANDROID || UNITY_EDITOR
+        LogEvent("game_pause",
             new Parameter("mode", mode),
             new Parameter("play_duration_sec", playDurationSec),
             new Parameter("score", currentScore));
+#else
+        WebAnalyticsBridge.LogModePause(mode, playDurationSec, currentScore);
+#endif
     }
 
     /// <summary>
@@ -364,17 +404,22 @@ public class FirebaseManager : SingletonInstance<FirebaseManager>, IManager
     /// </summary>
     public void LogGameOver(string mode, int finalScore, int maxCombo)
     {
-        FirebaseAnalytics.LogEvent("game_over",
+#if UNITY_ANDROID || UNITY_EDITOR
+        LogEvent("game_over",
             new Parameter("mode", mode),
             new Parameter("final_score", finalScore),
             new Parameter("max_combo", maxCombo)
             );
+#else
+        WebAnalyticsBridge.LogGameOver(mode, finalScore, maxCombo);
+#endif
     }
 
     #endregion
 
     #region Crashlytics
 
+#if UNITY_ANDROID || UNITY_EDITOR
     private void InitCrashlytics()
     {
         Crashlytics.ReportUncaughtExceptionsAsFatal = true;
@@ -399,8 +444,26 @@ public class FirebaseManager : SingletonInstance<FirebaseManager>, IManager
     {
         Crashlytics.SetCustomKey(key, value);
     }
+#else
+    private void InitCrashlytics()
+    {
+    }
+
+    public void Log(string message)
+    {
+    }
+
+    public void LogError(Exception e)
+    {
+    }
+
+    public void SetCustomKey(string key, string value)
+    {
+    }
+#endif
     #endregion
 
+#if UNITY_ANDROID || UNITY_EDITOR
     #region Messaging (FCM)
 
     private void InitMessaging()
@@ -427,7 +490,9 @@ public class FirebaseManager : SingletonInstance<FirebaseManager>, IManager
     }
 
     #endregion
+#endif
     #region PlayGames
+#if UNITY_ANDROID || UNITY_EDITOR
     public async UniTask<bool> IsAuthenticated()
     {
         if (!PlayGamesPlatform.Instance.IsAuthenticated())
@@ -457,15 +522,23 @@ public class FirebaseManager : SingletonInstance<FirebaseManager>, IManager
         if (await IsAuthenticated())
             PlayGamesPlatform.Instance.ShowLeaderboardUI(GPGSIds.leaderboard_high_score);
     }
+#else
+    public UniTask<bool> IsAuthenticated() => UniTask.FromResult(false);
+
+    private UniTask TryReportLeaderboard() => UniTask.CompletedTask;
+
+    public UniTask ShowLeaderboardUI() => UniTask.CompletedTask;
+#endif
     #endregion
 
     #region RemoteConfig
 
-    private const string MIN_VERSION_KEY = "min_required_version"; 
+    private const string MIN_VERSION_KEY = "min_required_version";
     private static string PLAY_STORE_URL => $"https://play.google.com/store/apps/details?id={Application.identifier}";
 
     public async UniTask CheckForForceUpdateAsync()
     {
+#if UNITY_ANDROID || UNITY_EDITOR
         try
         {
             var remoteConfig = FirebaseRemoteConfig.DefaultInstance;
@@ -484,12 +557,16 @@ public class FirebaseManager : SingletonInstance<FirebaseManager>, IManager
                 Logging($"강제 업데이트 필요: 현재 {currentVersion} < 최소 {minVersion}");
                 await ShowForceUpdatePopupAsync();
             }
+            else
+                IsUpdate = true;
         }
         catch (Exception e)
         {
             LogError(e);
             Warning($"강제 업데이트 체크 실패, 통과 처리: {e}");
+            IsUpdate = true;
         }
+#endif
     }
 
     private async UniTask ShowForceUpdatePopupAsync()
@@ -504,11 +581,15 @@ public class FirebaseManager : SingletonInstance<FirebaseManager>, IManager
                 Application.OpenURL(PLAY_STORE_URL);
                 ShowForceUpdatePopupAsync().Forget();
             },
+#if UNITY_EDITOR
+            onClickNoAction: () => UnityEditor.EditorApplication.isPlaying = false
+#else
             onClickNoAction: Application.Quit
+#endif
         );
     }
 
-    #endregion
+#endregion
 
     #region Public API
 
@@ -537,6 +618,7 @@ public class FirebaseManager : SingletonInstance<FirebaseManager>, IManager
             return InquiryResult.Fail(GameTextData.INQURIY_SEND_FAIL_3);
         }
 
+#if UNITY_ANDROID || UNITY_EDITOR
         try
         {
             var body = BuildEmailBody(content, userEmail);
@@ -563,12 +645,17 @@ public class FirebaseManager : SingletonInstance<FirebaseManager>, IManager
             Debug.LogError($"[InquiryManager] 문의 전송 실패: {e}");
             return InquiryResult.Fail(GameTextData.INQURIY_SEND_FAIL_4);
         }
+#else
+        Warning("웹 빌드에서는 문의 전송이 지원되지 않습니다.");
+        return InquiryResult.Fail(GameTextData.INQURIY_SEND_FAIL_4);
+#endif
     }
 
     #endregion
 
     #region Private Helpers
 
+#if UNITY_ANDROID || UNITY_EDITOR
     private string BuildEmailBody(string content, string userEmail)
     {
         var deviceInfo = $"{SystemInfo.deviceModel} / OS: {SystemInfo.operatingSystem}";
@@ -583,7 +670,7 @@ public class FirebaseManager : SingletonInstance<FirebaseManager>, IManager
             $"기기 정보: {deviceInfo}\n" +
             $"전송 시각(UTC): {DateTime.UtcNow:yyyy-MM-dd HH:mm:ss}";
     }
+#endif
 
     #endregion
 }
-

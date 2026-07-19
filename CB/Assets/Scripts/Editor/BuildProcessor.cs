@@ -23,6 +23,9 @@ public static class BuildProcessor
 
     private static bool _isJenkins = false;
 
+    // GA4 측정 ID (Google Analytics 관리 화면 > 데이터 스트림에서 발급). 실제 ID로 교체 필요.
+    private const string GA4MeasurementId = "G-7751YYDKFF";
+
     [MenuItem("Build/BuildAndroid_Debug")]
     public static void BuildAndroid_Debug()
     {
@@ -94,6 +97,39 @@ public static class BuildProcessor
         Build(BuildTarget.Android, options);
     }
 
+    [MenuItem("Build/BuildWebGL_Debug")]
+    public static void BuildWebGL_Debug()
+    {
+        string[] args = Environment.GetCommandLineArgs();
+
+        _isJenkins = args.Length > 0;
+        _newSymbol = "DEVELOP";
+        PlayerSettings.SetScriptingDefineSymbols(NamedBuildTarget.WebGL, _newSymbol);
+        EditorUserBuildSettings.development = true;
+        _autoIncrementPatch = false;
+        _autoBundleInc = false;
+
+        BuildOptions options = BuildOptions.Development;
+
+        Build(BuildTarget.WebGL, options);
+    }
+
+    [MenuItem("Build/BuildWebGL_Release")]
+    public static void BuildWebGL_Release()
+    {
+        string[] args = Environment.GetCommandLineArgs();
+        _isJenkins = args.Length > 0;
+        _newSymbol = "RELEASE";
+        PlayerSettings.SetScriptingDefineSymbols(NamedBuildTarget.WebGL, _newSymbol);
+        EditorUserBuildSettings.development = false;
+        _autoIncrementPatch = false;
+        _autoBundleInc = false;
+
+        BuildOptions options = BuildOptions.None;
+
+        Build(BuildTarget.WebGL, options);
+    }
+
     private static void LoadData()
     {
         string ver = PlayerSettings.bundleVersion;
@@ -110,25 +146,37 @@ public static class BuildProcessor
         LoadData();
         // Patch 자동 증가
         if (_autoIncrementPatch) _patch++;
-        if (_autoBundleInc) PlayerSettings.Android.bundleVersionCode++;
+        if (buildTarget == BuildTarget.Android && _autoBundleInc) PlayerSettings.Android.bundleVersionCode++;
 
         string version = $"{_major}.{_minor}.{_patch}";
         PlayerSettings.bundleVersion = version;
 
-        string buildDir = Path.Combine(Application.dataPath, "../Build/Android");
+        string platformFolder = buildTarget == BuildTarget.WebGL ? "WebGL" : "Android";
+        string buildDir = Path.Combine(Application.dataPath, $"../Build/{platformFolder}");
         Directory.CreateDirectory(buildDir);
 
-        string fileName;
-        if (EditorUserBuildSettings.buildAppBundle)
+        string outputPath;
+        if (buildTarget == BuildTarget.WebGL)
         {
-            fileName = $"SlideBlock_{version}.aab";
+            // WebGL은 단일 파일이 아닌 폴더(index.html 등)로 빌드됨
+            outputPath = Path.Combine(buildDir, $"SlideBlock_{version}_{_newSymbol}");
+            Directory.CreateDirectory(outputPath);
+        }
+        else if (EditorUserBuildSettings.buildAppBundle)
+        {
+            outputPath = Path.Combine(buildDir, $"SlideBlock_{version}.aab");
         }
         else
-            fileName = $"SlideBlock_{version}_{_newSymbol}.apk";
+        {
+            outputPath = Path.Combine(buildDir, $"SlideBlock_{version}_{_newSymbol}.apk");
+        }
 
-        string outputPath = Path.Combine(buildDir, fileName);
+        if (buildTarget == BuildTarget.Android)
+            EditorUserBuildSettings.androidBuildSystem = AndroidBuildSystem.Gradle;
 
-        EditorUserBuildSettings.androidBuildSystem = AndroidBuildSystem.Gradle;
+        if (buildTarget == BuildTarget.WebGL)
+            PlayerSettings.WebGL.decompressionFallback = true;
+
         try
         {
             string[] scenes = EditorBuildSettings.scenes
@@ -151,6 +199,9 @@ public static class BuildProcessor
                 throw new Exception($"Build Failed: {report.summary.result}\nTotal errors: {report.summary.totalErrors}");
             }
 
+            if (buildTarget == BuildTarget.WebGL)
+                InjectGtagSnippet(outputPath);
+
             Debug.Log($"Build Success: {outputPath}");
             if (!_isJenkins) EditorUtility.RevealInFinder(buildDir);
         }
@@ -161,6 +212,40 @@ public static class BuildProcessor
         }
 
         //if (_isJenkins)  EditorApplication.Exit(0);
+    }
+
+    // WebGL 빌드 결과물의 index.html <head>에 GA4(gtag.js) 스니펫을 주입
+    private static void InjectGtagSnippet(string webglOutputDir)
+    {
+        if (GA4MeasurementId == "G-XXXXXXXXXX")
+        {
+            Debug.LogWarning("GA4MeasurementId가 설정되지 않아 gtag 스니펫 주입을 건너뜁니다. BuildProcessor.GA4MeasurementId를 실제 측정 ID로 교체하세요.");
+            return;
+        }
+
+        string indexPath = Path.Combine(webglOutputDir, "index.html");
+        if (!File.Exists(indexPath))
+        {
+            Debug.LogWarning($"gtag 스니펫 주입 실패: index.html을 찾을 수 없습니다. ({indexPath})");
+            return;
+        }
+
+        string html = File.ReadAllText(indexPath);
+        if (html.Contains("googletagmanager.com/gtag/js"))
+            return; // 이미 삽입됨
+
+        string snippet =
+            $"<script async src=\"https://www.googletagmanager.com/gtag/js?id={GA4MeasurementId}\"></script>\n" +
+            "<script>\n" +
+            "  window.dataLayer = window.dataLayer || [];\n" +
+            "  function gtag(){dataLayer.push(arguments);}\n" +
+            "  gtag('js', new Date());\n" +
+            $"  gtag('config', '{GA4MeasurementId}');\n" +
+            "</script>\n";
+
+        html = html.Replace("</head>", snippet + "</head>");
+        File.WriteAllText(indexPath, html);
+        Debug.Log("gtag(GA4) 스니펫을 index.html에 삽입했습니다.");
     }
 
     // ------------------------

@@ -3,6 +3,7 @@ using GoogleMobileAds.Api;
 using GoogleMobileAds.Ump.Api;
 using System.Collections.Generic;
 
+#if UNITY_ANDROID || UNITY_EDITOR
 [ManagerOrder(2)]
 public class AdmobManager : SingletonInstance<AdmobManager>, IManager
 {
@@ -151,3 +152,4 @@ public class AdmobManager : SingletonInstance<AdmobManager>, IManager
         }
     }
 }
+#endif

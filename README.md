@@ -170,10 +170,10 @@ SDK         ← 에디터 도구 (TK 하위)
 
 ## 법적 문서
 
-GitHub Pages (`https://cloud1202.github.io/`)에 Jekyll로 호스팅.
+GitHub Pages (`https://layoncraft.github.io/`)에 정적 페이지로 호스팅.
 
-- `privacy-policy.html`
-- `terms-of-service.html` (UniTask MIT 라이선스 포함)
+- `PrivacyPolicy/SlideBlock.html`
+- `Terms/SlideBlock.html` (UniTask MIT 라이선스 포함)
 
 인게임 로비 좌상단 "Legal" 텍스트 + 버전 표시로 접근 가능.
 
