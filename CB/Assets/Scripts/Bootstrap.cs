@@ -59,6 +59,6 @@ public class Bootstrap : MonoBehaviour
             go.AddComponent(type);
         }
 
-        GameManager.Instance.Bootstrap().Forget();
+       // GameManager.Instance.Bootstrap().Forget();
     }
 }

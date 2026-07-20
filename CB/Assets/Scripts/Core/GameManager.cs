@@ -1,9 +1,10 @@
 using Cysharp.Threading.Tasks;
+using System.Threading;
 using UnityEngine;
 using UnityEngine.InputSystem;
+using VContainer.Unity;
 
-[ManagerOrder(0)]
-public class GameManager : SingletonInstance<GameManager>, IManager
+public class GameManager : IAsyncStartable, System.IDisposable
 {
     public int HighScore
     {
@@ -127,5 +128,15 @@ public class GameManager : SingletonInstance<GameManager>, IManager
     {
         PlayerPrefs.Save();
         FirebaseManager.Instance.LogEvent("app_quit","real_time", Time.realtimeSinceStartup.ToString());
+    }
+
+    public void Dispose()
+    {
+        throw new System.NotImplementedException();
+    }
+
+    public UniTask StartAsync(CancellationToken cancellation = default)
+    {
+        throw new System.NotImplementedException();
     }
 }

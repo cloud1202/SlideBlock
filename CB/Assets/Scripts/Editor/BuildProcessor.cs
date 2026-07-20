@@ -164,15 +164,16 @@ public static class BuildProcessor
         }
         else if (EditorUserBuildSettings.buildAppBundle)
         {
-            outputPath = Path.Combine(buildDir, $"SlideBlock_{version}.aab");
+            outputPath = Path.Combine(buildDir, $"{PlayerSettings.productName}_{version}.aab");
         }
         else
         {
-            outputPath = Path.Combine(buildDir, $"SlideBlock_{version}_{_newSymbol}.apk");
+            outputPath = Path.Combine(buildDir, $"{PlayerSettings.productName}_{version}_{_newSymbol}.apk");
         }
 
         if (buildTarget == BuildTarget.Android)
             EditorUserBuildSettings.androidBuildSystem = AndroidBuildSystem.Gradle;
+        
 
         if (buildTarget == BuildTarget.WebGL)
             PlayerSettings.WebGL.decompressionFallback = true;
