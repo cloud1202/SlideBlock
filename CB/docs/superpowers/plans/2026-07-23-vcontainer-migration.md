@@ -1,135 +1,95 @@
 # VContainer Full Migration Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+>
+> **Note for this project:** the user is implementing this plan by hand in the Unity Editor, not delegating it to an agent. Steps are still written bite-sized and in order so they can be followed one at a time; "run the tests" steps are replaced with "Play the scene and check X" since this project has no automated test suite.
 
-**Goal:** Replace the `SingletonInstance<T>`/`ReferenceManager<T>` + `.Instance` singleton pattern with VContainer DI across every manager and every runtime-spawned gameplay/UI object, and retire the reflection-based `Bootstrap.cs` loader.
+**Goal:** Replace the `SingletonInstance<T>`/`ReferenceManager<T>` + `.Instance` singleton pattern with VContainer dependency injection everywhere, and retire the reflection-based `Bootstrap.cs` loader in favor of `GameLifetimeScope`.
 
-**Architecture:** `GameLifetimeScope` stays the single registration point for the 7 managers + `GameManager`. Managers convert from `.Instance` access to `[Inject]` method injection (MonoBehaviours can't take constructor injection). `AddressableManager.Instantiate<T>` — the single choke point every runtime prefab spawn already funnels through — gains `IObjectResolver` and calls `resolver.InjectGameObject(go)` right after instantiation, so every dynamically spawned object (`RoundManager`, `Board`, `Brick`, all UI popups) is auto-injected with no per-call-site changes needed.
+**Architecture:** Convert managers bottom-up by dependency (leaf managers first), but **keep each manager's own `SingletonInstance<T>` base in place until every external consumer of that manager's `.Instance` has been converted.** This is the key correctness rule of this plan: a manager's `.Instance` accessor cannot be removed until nothing in the whole codebase still calls it — so each task adds `[Inject]` wiring and fixes whichever call sites it can, without yet deleting the fallback that keeps not-yet-converted files compiling. Only the final task (Task 10) strips every singleton base at once, after a project-wide grep confirms zero remaining `.Instance` references. `PrefabManager` gains an `IObjectResolver` so every runtime-instantiated prefab (UI popups, `RoundManager`, `Board`, `Brick`) is auto-injected on spawn.
 
-**Tech Stack:** Unity, C#, VContainer, UniTask (Cysharp), Addressables.
+**Tech Stack:** Unity, VContainer, UniTask (Cysharp), Addressables.
 
 ## Global Constraints
 
-- No automated test suite exists in this project. "Testing" a task means: the project compiles with no errors, and a manual Play-mode check in `Color_Brick.unity` shows the touched feature still works with no new console errors/exceptions.
-- `PlayGamesPlatform.Instance` (`FirebaseManager.cs`) is a third-party SDK singleton — out of scope, do not touch.
-- `EditBrickColor.unity`/`BrickColorEditorManager` and `Test.unity` are out of scope.
-- Convert bottom-up by dependency so no task leaves a compile error from a half-converted neighbor: `AddressableManager` → `PrefabManager`/`ReferenceManager<T>` → `FirebaseManager` → `SoundManager`/`TextDataManager`/`InputManager`/`AdmobManager` → `GameManager` → `RoundManager`/`Board`/`Brick` → UI layer → cleanup.
-- Every manager currently declares `[ManagerOrder(N)]` and implements `IManager` — both exist only to feed `Bootstrap.cs`'s reflection scan. Strip both from each manager's class declaration as part of that manager's own task (not saved for the end) so no file needs touching twice.
+- No automated test suite exists in this project — every "verify" step means: open `Color_Brick.unity` in the Unity Editor, press Play, and check the specified behavior/console output. Do this after every task before moving to the next.
+- **Never remove a manager's `SingletonInstance<T>`/`ReferenceManager<T>` inheritance until grep confirms zero remaining `TypeName.Instance` references to it anywhere in `Assets/Scripts`.** Task 10 is the only task that does this, for every manager at once. Every earlier task must leave the project compiling — if a task's own file still needs `.Instance` for a manager that isn't fully converted yet on the consumer side, that's fine; the point is other files must never lose access to `.Instance` before they're individually updated.
+- `PlayGamesPlatform.Instance` (`FirebaseManager.cs`) is a third-party SDK singleton — never touch it.
+- `EditBrickColor.unity` / `BrickColorEditorManager` and `Test.unity` are out of scope.
+- Injection pattern for MonoBehaviours: a public method tagged `[Inject]` (from `VContainer`), receiving dependencies as parameters and assigning them to private fields. Never constructor-inject a MonoBehaviour (Unity doesn't support it). VContainer calls every `[Inject]`-tagged method it finds across a type's whole inheritance chain, so a base class and a derived class can each have their own without conflict — just give them different method names if both classes declare one (e.g. base `Construct`, derived `ConstructFirebase`).
 
 ---
 
-### Task 1: `ManagerBehaviour` base class + convert `AddressableManager`
+### Task 1: Delete `Bootstrap.cs`
+
+`GameLifetimeScope` already registers the exact 7 managers + `GameManager` that `Bootstrap.cs` reflects over and spawns. Having both active is a live race: whichever `Awake()` runs first "wins" the singleton slot (`SingletonInstance<T>.Init()` destroys the loser), so it's possible for the VContainer-registered instance to be the one destroyed, leaving the container holding a dead reference while `.Instance` still resolves to the Bootstrap-spawned twin. Removing `Bootstrap.cs` first eliminates this race before any injection wiring is added.
 
 **Files:**
-- Create: `Assets/Scripts/Share/ManagerBehaviour.cs`
-- Modify: `Assets/Scripts/Core/Core_Resource/AddressableManager.cs`
+- Delete: `Assets/Scripts/Bootstrap.cs`
+- Delete: `Assets/Scripts/Bootstrap.cs.meta`
 
-**Interfaces:**
-- Produces: `ManagerBehaviour` (abstract `MonoBehaviour` subclass with `Logging`/`Warning`/`Error` protected helpers) — every other manager in later tasks extends this instead of `SingletonInstance<T>`.
-- Produces: `AddressableManager` gains a public `[Inject] Construct(IObjectResolver resolver)` method; `Instantiate<T>` now injects the spawned GameObject.
+**Interfaces:** None — this task only removes a file.
 
-- [ ] **Step 1: Create `ManagerBehaviour`**
+- [ ] **Step 1: Confirm nothing else references `Bootstrap`**
 
-`SingletonInstance<T>`'s `Logging`/`Warning`/`Error` helpers are pure logging convenience, unrelated to the singleton mechanics being removed. Give managers a lightweight non-singleton home for them:
+Search the project for `Bootstrap` (the class, not `GameManager.Bootstrap()` — an unrelated method that gets replaced in Task 6, not here). If a scene has a GameObject with a `Bootstrap` component attached, remove that component from the scene too.
 
-```csharp
-using UnityEngine;
+- [ ] **Step 2: Delete the file**
 
-public abstract class ManagerBehaviour : MonoBehaviour
-{
-    protected void Logging(string log)
-    {
-        LLogger.Log(log, color: Colors.Yellow, skipFrames: 2);
-    }
-
-    protected void Warning(string log)
-    {
-        LLogger.Log(log, level: LLogger.LogLevel.Warning, skipFrames: 2);
-    }
-
-    protected void Error(string log)
-    {
-        LLogger.Log(log, level: LLogger.LogLevel.Error, skipFrames: 2);
-    }
-}
+```bash
+git rm Assets/Scripts/Bootstrap.cs Assets/Scripts/Bootstrap.cs.meta
 ```
 
-- [ ] **Step 2: Convert `AddressableManager` to extend `ManagerBehaviour` and inject `IObjectResolver`**
+- [ ] **Step 3: Verify in Editor**
 
-Change the class declaration and add the resolver field (full file, since the diff touches the top and the `Instantiate` method):
-
-```csharp
-using Cysharp.Threading.Tasks;
-using System.Collections.Generic;
-using System.Threading;
-using UnityEngine;
-using UnityEngine.AddressableAssets;
-using UnityEngine.ResourceManagement.AsyncOperations;
-using VContainer;
-using VContainer.Unity;
-
-public class AddressableManager : ManagerBehaviour
-{
-    private IObjectResolver _resolver;
-    private Dictionary<ContainLabel, List<AsyncOperationHandle>> _loadHandles = new Dictionary<ContainLabel, List<AsyncOperationHandle>>();
-    private List<GameObject> _instantiateHandles = new List<GameObject>();
-
-    [Inject]
-    public void Construct(IObjectResolver resolver)
-    {
-        _resolver = resolver;
-    }
-
-    // ... SetAddressable, LoadRemoteAddressable, UpdateLoadGauage, CompletionAddressableLoad,
-    // AssetReleaseForLabel, InstantiateRelease, PreloadAssets, Load<T> stay exactly as they are today.
-
-    public async UniTask<T> Instantiate<T>(IAssetResource assetResource, Transform parent, bool isProtected)
-    {
-        var go = await assetResource.InstantiateAsync<GameObject>(parent);
-        _resolver.InjectGameObject(go);
-
-        var obj = go.AddComponent<InstantiateObject>();
-        if (isProtected == false)
-            _instantiateHandles.Add(go);
-
-        obj.SetAssetReference(assetResource);
-
-        return go.GetComponent<T>();
-    }
-
-    public async UniTask<T> LoadResourceData<T>(string name)
-    {
-        return await Addressables.LoadAssetAsync<T>($"Assets/AddressableAssets/ScriptableObject/{name}.asset");
-    }
-}
-```
-
-Delete the old `public override void Init() { base.Init(); }` — it did nothing beyond the singleton dedup logic that no longer exists.
-
-- [ ] **Step 3: Compile and fix any errors in this file**
-
-Unity Editor → wait for script compilation → Console shows no errors referencing `AddressableManager.cs`.
+Play `Color_Brick.unity`. Expected: the game still boots — lobby appears, no missing-manager errors in the console. (`GameLifetimeScope` alone now creates every manager.)
 
 - [ ] **Step 4: Commit**
 
 ```bash
-git add Assets/Scripts/Share/ManagerBehaviour.cs Assets/Scripts/Core/Core_Resource/AddressableManager.cs
-git commit -m "vcontainer: convert AddressableManager off singleton pattern"
+git add -A
+git commit -m "Remove redundant Bootstrap.cs reflection spawner"
 ```
 
 ---
 
-### Task 2: Convert `ReferenceManager<T>` + `PrefabManager`
+### Task 2: `AddressableManager` → DI (+ its Core consumers)
+
+`AddressableManager` is a leaf (nothing else has to happen first). Its consumers are all inside `Core/`: `ReferenceManager<T>` (base for `PrefabManager`/`SoundManager`), `PrefabManager`, `SoundManager`, `TextDataManager`. Converting all four together in one task means `AddressableManager`'s singleton base can be dropped immediately — nothing outside this task's files calls `AddressableManager.Instance`.
 
 **Files:**
+- Modify: `Assets/Scripts/Core/Core_Resource/AddressableManager.cs`
 - Modify: `Assets/Scripts/Core/ReferenceManager.cs`
 - Modify: `Assets/Scripts/Core/PrefabManager.cs`
+- Modify: `Assets/Scripts/Core/SoundManager.cs`
+- Modify: `Assets/Scripts/Core/TextDataManager.cs`
 
 **Interfaces:**
-- Consumes: `ManagerBehaviour` (Task 1), `AddressableManager` (Task 1, now injectable).
-- Produces: `ReferenceManager<T>` exposes `protected AddressableManager _addressableManager` (populated via `[Inject]`) for `PrefabManager`/`SoundManager`/`TextDataManager` (later tasks) to use directly.
+- Produces: `ReferenceManager<T>` exposes `protected AddressableManager _addressableManager` to derived classes (`PrefabManager`, `SoundManager`).
 
-- [ ] **Step 1: Convert `ReferenceManager<T>`**
+- [ ] **Step 1: Drop `AddressableManager`'s singleton base**
+
+`Assets/Scripts/Core/Core_Resource/AddressableManager.cs:8` — this is safe to do now because grep confirms every consumer is fixed within this same task:
+
+```csharp
+// Before
+public class AddressableManager : SingletonInstance<AddressableManager>
+
+// After
+public class AddressableManager : MonoBehaviour
+```
+
+Delete the now-pointless override at lines 13-16 (there's no base `Init()` to call anymore):
+```csharp
+public override void Init()
+{
+    base.Init();
+}
+```
+
+- [ ] **Step 2: Wire `ReferenceManager<T>` to receive `AddressableManager` via injection**
+
+`Assets/Scripts/Core/ReferenceManager.cs` — add a field and an `[Inject]` method, and replace the 3 internal `AddressableManager.Instance` calls:
 
 ```csharp
 using Cysharp.Threading.Tasks;
@@ -138,17 +98,22 @@ using System.Threading;
 using UnityEngine;
 using VContainer;
 
-public class ReferenceManager<T> : ManagerBehaviour
+public class ReferenceManager<T> : SingletonInstance<T>
     where T : MonoBehaviour
 {
     protected AddressableManager _addressableManager;
-    protected Dictionary<int, IAssetResource> _assetMap = new Dictionary<int, IAssetResource>();
-    protected IEnumerable<IAssetResource> _assetDatas = new List<IAssetResource>();
 
     [Inject]
     public void Construct(AddressableManager addressableManager)
     {
         _addressableManager = addressableManager;
+    }
+
+    protected Dictionary<int, IAssetResource> _assetMap = new Dictionary<int, IAssetResource>();
+    protected IEnumerable<IAssetResource> _assetDatas = new List<IAssetResource>();
+    public override void Init()
+    {
+        base.Init();
     }
 
     async public virtual UniTask LoadAssetReference()
@@ -191,7 +156,6 @@ public class ReferenceManager<T> : ManagerBehaviour
 
         return await _addressableManager.Load<TI>(obj, ct);
     }
-
     protected async UniTask<TI> InstantiateObject<TI>(int index, Transform parent = null, bool isProtected = false)
     {
         if (_assetMap.TryGetValue(index, out var obj) == false)
@@ -207,307 +171,60 @@ public class ReferenceManager<T> : ManagerBehaviour
 }
 ```
 
-Note: `Init()` override is gone — nothing in the base class needs it now (removes the `SingletonInstance<T>` generic dedup logic entirely, since VContainer's `RegisterComponentOnNewGameObject` guarantees exactly one instance already).
+Note: `SingletonInstance<T>` base stays for now — `PrefabManager.Instance`/`SoundManager.Instance` are still used by dozens of files not touched until later tasks. Only `AddressableManager`'s own base is dropped in this task.
 
-- [ ] **Step 2: Convert `PrefabManager`**
+- [ ] **Step 3: Fix `PrefabManager`'s own `AddressableManager.Instance` call**
+
+`Assets/Scripts/Core/PrefabManager.cs:20` (inside `LoadAssetReference`):
+
+```csharp
+// Before
+var assets = await AddressableManager.Instance.LoadResourceData<PrefabAssetReference>(nameof(PrefabAssetReference));
+
+// After
+var assets = await _addressableManager.LoadResourceData<PrefabAssetReference>(nameof(PrefabAssetReference));
+```
+
+`Assets/Scripts/Core/PrefabManager.cs:85` (inside `InstantiateUI`):
+
+```csharp
+// Before
+return await AddressableManager.Instance.Instantiate<TI>(obj, parent, isProtected);
+
+// After
+return await _addressableManager.Instantiate<TI>(obj, parent, isProtected);
+```
+
+(`_addressableManager` is the inherited protected field from `ReferenceManager<T>` — no new field needed in `PrefabManager` itself.)
+
+- [ ] **Step 4: Fix `SoundManager`'s own `AddressableManager.Instance` call**
+
+`Assets/Scripts/Core/SoundManager.cs:109` (inside `LoadAssetReference`):
+
+```csharp
+// Before
+var assets = await AddressableManager.Instance.LoadResourceData<SoundAssetReference>(nameof(SoundAssetReference));
+
+// After
+var assets = await _addressableManager.LoadResourceData<SoundAssetReference>(nameof(SoundAssetReference));
+```
+
+- [ ] **Step 5: Wire `TextDataManager`** (doesn't extend `ReferenceManager<T>`, needs its own injection)
+
+`Assets/Scripts/Core/TextDataManager.cs`:
 
 ```csharp
 using Cysharp.Threading.Tasks;
-using UnityEngine;
-
-public class PrefabManager : ReferenceManager<PrefabManager>
-{
-    private ISafeAreaFitter _staticCanvas;
-    private ISafeAreaFitter _dynamicCanvas;
-    private Camera _mainCamera;
-    public RectTransform MainCanvas => _staticCanvas.MyRT;
-    public Camera MainCamera => _mainCamera;
-
-    async public override UniTask LoadAssetReference()
-    {
-        var assets = await _addressableManager.LoadResourceData<PrefabAssetReference>(nameof(PrefabAssetReference));
-        _assetDatas = assets.assetDatas;
-        await base.LoadAssetReference();
-    }
-
-    async public UniTask InitLoadObjects()
-    {
-        _staticCanvas = await InstantiateObject<ISafeAreaFitter>(PrefabData.StaticCanvas, this.transform, true);
-        _dynamicCanvas = await InstantiateObject<ISafeAreaFitter>(PrefabData.DynamicCanvas, this.transform, true);
-        _staticCanvas.InitSafeArea();
-        _dynamicCanvas.InitSafeArea();
-        _staticCanvas.MyCanvas.worldCamera = _mainCamera;
-        _dynamicCanvas.MyCanvas.worldCamera = _mainCamera;
-    }
-
-    public bool TryGetInstance<TI>(PrefabData type, out TI instance)
-    {
-        instance = default;
-        if (_assetMap.TryGetValue(EnumConverter.Enum32ToInt(type), out var obj) == false)
-            return false;
-
-        if (obj.instance == null)
-            return false;
-
-        instance = obj.instance.GetComponent<TI>();
-        return instance != null;
-    }
-
-    public async UniTask<TI> InstantiateObject<TI>(PrefabData type, Transform parent = null, bool isProtected = false)
-    {
-        return await InstantiateObject<TI>(EnumConverter.Enum32ToInt(type), parent, isProtected);
-    }
-
-    async public UniTask<TI> InstantiateDynamicUI<TI>(PrefabData type, Transform parent = null, bool isProtected = false)
-    {
-        if (parent == null)
-            parent = _dynamicCanvas.Root;
-
-        return await InstantiateUI<TI>(type, parent, isProtected);
-    }
-
-    async public UniTask<TI> InstantiateStaticUI<TI>(PrefabData type, Transform parent = null, bool isProtected = false)
-    {
-        if (parent == null)
-            parent = _staticCanvas.Root;
-
-        return await InstantiateUI<TI>(type, parent, isProtected);
-    }
-
-    async private UniTask<TI> InstantiateUI<TI>(PrefabData type, Transform parent, bool isProtected)
-    {
-        if (_assetMap.TryGetValue(EnumConverter.Enum32ToInt(type), out var obj) == false)
-        {
-            Logging($"Not Find AssetReference! {type}");
-            return default;
-        }
-
-        if (obj.isInstance)
-        {
-            Logging($"Current Use Instance! {type}");
-            return obj.instance.GetComponent<TI>();
-        }
-
-        return await _addressableManager.Instantiate<TI>(obj, parent, isProtected);
-    }
-}
-```
-
-Dropped: `: IManager` interface and the (already-empty) `Init()` override.
-
-- [ ] **Step 3: Remove `[ManagerOrder(4)]` from `PrefabManager`'s class declaration** (already reflected in the code above — just confirm the attribute line is gone).
-
-- [ ] **Step 4: Compile and fix errors**
-
-- [ ] **Step 5: Commit**
-
-```bash
-git add Assets/Scripts/Core/ReferenceManager.cs Assets/Scripts/Core/PrefabManager.cs
-git commit -m "vcontainer: convert ReferenceManager and PrefabManager off singleton pattern"
-```
-
----
-
-### Task 3: Convert `FirebaseManager`
-
-**Files:**
-- Modify: `Assets/Scripts/Core/FirebaseManager.cs`
-
-**Interfaces:**
-- Consumes: `ManagerBehaviour` (Task 1), `PrefabManager` (Task 2).
-- Produces: `FirebaseManager` injectable via `[Inject]` in later tasks (`SoundManager`, `AdmobManager`, `GameManager`, `RoundManager`, `Board`, most UI).
-
-- [ ] **Step 1: Update the class declaration and add injection**
-
-```csharp
-public class FirebaseManager : ManagerBehaviour
-{
-    private PrefabManager _prefabManager;
-
-    [Inject]
-    public void Construct(PrefabManager prefabManager)
-    {
-        _prefabManager = prefabManager;
-    }
-    // ... rest of the fields/properties unchanged
-```
-
-Remove `[ManagerOrder(1)]` and `: IManager`.
-
-- [ ] **Step 2: Replace `Init()` override with `Awake()`**
-
-`public override void Init() { base.Init(); InitializeFirebase(); }` becomes:
-
-```csharp
-private void Awake()
-{
-    InitializeFirebase();
-}
-```
-
-(VContainer injects `[Inject]` methods before `Awake` fires on container-created components, so `_prefabManager` is populated in time.)
-
-- [ ] **Step 3: Replace the one internal `.Instance` call site**
-
-Line ~576, inside `ShowForceUpdatePopupAsync`:
-
-```csharp
-// before
-var popup = await PrefabManager.Instance.InstantiateDynamicUI<IPopupQuestion>(PrefabData.PopupQuestionUI);
-// after
-var popup = await _prefabManager.InstantiateDynamicUI<IPopupQuestion>(PrefabData.PopupQuestionUI);
-```
-
-- [ ] **Step 4: Leave every `PlayGamesPlatform.Instance` call untouched** — third-party SDK singleton, out of scope per Global Constraints.
-
-- [ ] **Step 5: Compile and fix errors**
-
-- [ ] **Step 6: Commit**
-
-```bash
-git add Assets/Scripts/Core/FirebaseManager.cs
-git commit -m "vcontainer: convert FirebaseManager off singleton pattern"
-```
-
----
-
-### Task 4: Convert `SoundManager`
-
-**Files:**
-- Modify: `Assets/Scripts/Core/SoundManager.cs`
-- Modify: `Assets/Scripts/Core/Sound/SoundEmitter.cs`
-
-**Interfaces:**
-- Consumes: `ReferenceManager<T>` (Task 2, provides `_addressableManager`), `FirebaseManager` (Task 3).
-- Produces: `SoundManager` injectable via `[Inject]` in `RoundManager`, `Board`, `GameOverUI`, `GameLobbyUI`, `InGameUI`, `SoundSettingUI`, `SoundEmitter`.
-
-- [ ] **Step 1: Update class declaration and injection**
-
-```csharp
-public class SoundManager : ReferenceManager<SoundManager>
-{
-    private FirebaseManager _firebaseManager;
-
-    [Inject]
-    public void Construct(FirebaseManager firebaseManager)
-    {
-        _firebaseManager = firebaseManager;
-    }
-    // fields (_bgmAudio, _sfxAudio, volume properties) unchanged
-```
-
-Remove `[ManagerOrder(6)]` and `: IManager`.
-
-- [ ] **Step 2: Replace `Init()` override with `Awake()`**
-
-```csharp
-private void Awake()
-{
-    CreateBGMAudio();
-    CreateSFXAudio();
-
-    LoadSaveFieldData().Forget();
-    SoundVolumPer = 0.5f;
-}
-```
-
-- [ ] **Step 3: Replace every `FirebaseManager.Instance`/`AddressableManager.Instance` call in this file with the injected fields**
-
-```csharp
-// IsBGMOn getter/setter, IsSFXOn getter/setter, LoadSaveFieldData:
-// FirebaseManager.Instance.IsBGMOn -> _firebaseManager.IsBGMOn
-// FirebaseManager.Instance.IsSFXOn -> _firebaseManager.IsSFXOn
-
-// LoadAssetReference:
-// AddressableManager.Instance.LoadResourceData<SoundAssetReference>(...) -> _addressableManager.LoadResourceData<SoundAssetReference>(...)
-```
-
-- [ ] **Step 4: Update `SoundEmitter.cs`**
-
-```csharp
-using Cysharp.Threading.Tasks;
+using System.Collections.Generic;
 using UnityEngine;
 using VContainer;
-using static SoundManager;
+using static GameTextSO;
 
-[RequireComponent(typeof(AudioSource))]
-public class SoundEmitter : MonoBehaviour
+[ManagerOrder(5)]
+public class TextDataManager : SingletonInstance<TextDataManager>, IManager
 {
-    [SerializeField] private SoundData _soundType;
-    private AudioSource _audioSource;
-    private float _initVolum;
-    private SoundManager _soundManager;
-
-    [Inject]
-    public void Construct(SoundManager soundManager)
-    {
-        _soundManager = soundManager;
-    }
-
-    private void Awake()
-    {
-        _audioSource = GetComponent<AudioSource>();
-        _initVolum = _audioSource.volume;
-        SetAudioClip().Forget();
-        _soundManager.SubscribeToSoundHandler(UpdateVolum);
-    }
-
-    async private UniTask SetAudioClip()
-    {
-    }
-
-    private void OnDestroy()
-    {
-        _soundManager?.UnsubscribeToSoundHandler(UpdateVolum);
-    }
-
-    private void UpdateVolum(float volumPer)
-    {
-        _audioSource.volume = _initVolum * volumPer;
-    }
-
-    public void PlaySound()
-    {
-        _audioSource.Play();
-    }
-
-    public void FadeSound(float value, float duration)
-    {
-    }
-}
-```
-
-The `SoundManager.IsCreatedInstance()` guard is gone — there's no static singleton left to guard against, and `?.` handles the case where injection never ran.
-
-- [ ] **Step 5: Compile and fix errors**
-
-- [ ] **Step 6: Play `Color_Brick.unity`, confirm BGM/SFX still play and the mute toggles in the sound settings popup still work**
-
-- [ ] **Step 7: Commit**
-
-```bash
-git add Assets/Scripts/Core/SoundManager.cs Assets/Scripts/Core/Sound/SoundEmitter.cs
-git commit -m "vcontainer: convert SoundManager and SoundEmitter off singleton pattern"
-```
-
----
-
-### Task 5: Convert `TextDataManager`
-
-**Files:**
-- Modify: `Assets/Scripts/Core/TextDataManager.cs`
-
-**Interfaces:**
-- Consumes: `SingletonInstance<T>` removed → extends `ManagerBehaviour` directly (it doesn't share `ReferenceManager<T>`'s asset-map logic, just needs `AddressableManager`).
-- Produces: `TextDataManager` injectable via `[Inject]` in `TextHandler`, `PopupQuestionUI`, `PopupNoticeUI`, `GameManager`.
-
-- [ ] **Step 1: Update class declaration and injection**
-
-```csharp
-public class TextDataManager : ManagerBehaviour
-{
-    private AddressableManager _addressableManager;
     private GameTextSO _gameText;
+    private AddressableManager _addressableManager;
 
     protected Dictionary<int, GameText> _gameTextMap = new Dictionary<int, GameText>();
 
@@ -515,6 +232,11 @@ public class TextDataManager : ManagerBehaviour
     public void Construct(AddressableManager addressableManager)
     {
         _addressableManager = addressableManager;
+    }
+
+    public override void Init()
+    {
+        base.Init();
     }
 
     async public virtual UniTask LoadAssetReference()
@@ -547,280 +269,656 @@ public class TextDataManager : ManagerBehaviour
 }
 ```
 
-Remove `[ManagerOrder(5)]` and `: IManager`; the empty `Init()` override is gone entirely (nothing left to run at startup for this manager).
-
-- [ ] **Step 2: Compile and fix errors**
-
-- [ ] **Step 3: Commit**
+- [ ] **Step 6: Grep-confirm no other file still references `AddressableManager.Instance`**
 
 ```bash
-git add Assets/Scripts/Core/TextDataManager.cs
-git commit -m "vcontainer: convert TextDataManager off singleton pattern"
+grep -rn "AddressableManager.Instance" Assets/Scripts
 ```
 
----
+Expected: no output. This is what makes dropping the singleton base in Step 1 safe.
 
-### Task 6: Convert `InputManager`
+- [ ] **Step 7: Verify in Editor**
 
-**Files:**
-- Modify: `Assets/Scripts/Core/InputManager.cs`
-
-**Interfaces:**
-- Produces: `InputManager` injectable via `[Inject]` in `GameManager`, `Board`, `MenuUI`, `PopupQuestionUI`.
-
-- [ ] **Step 1: Update class declaration and `Init()` → `Awake()`**
-
-```csharp
-public class InputManager : ManagerBehaviour
-{
-    private PlayerInput _inputHandler;
-
-    public bool UseInputHandler
-    {
-        set
-        {
-            if (value)
-                _inputHandler.Player.Enable();
-            else
-                _inputHandler.Player.Disable();
-        }
-    }
-
-    private void Awake()
-    {
-        _inputHandler = new PlayerInput();
-        UseInputHandler = true;
-    }
-
-    // SubscribeToInputHandler / UnsubscribeToInputHandler unchanged
-}
-```
-
-Remove `[ManagerOrder(3)]` and `: IManager`.
-
-- [ ] **Step 2: Compile and fix errors**
-
-- [ ] **Step 3: Commit**
-
-```bash
-git add Assets/Scripts/Core/InputManager.cs
-git commit -m "vcontainer: convert InputManager off singleton pattern"
-```
-
----
-
-### Task 7: Convert `AdmobManager`
-
-**Files:**
-- Modify: `Assets/Scripts/Core/AdmobManager.cs`
-
-**Interfaces:**
-- Consumes: `FirebaseManager` (Task 3).
-- Produces: `AdmobManager` injectable via `[Inject]` in `GameOverUI`.
-
-- [ ] **Step 1: Update class declaration, injection, and `Init()` → `Awake()`**
-
-```csharp
-#if UNITY_ANDROID || UNITY_EDITOR
-public class AdmobManager : ManagerBehaviour
-{
-    private FirebaseManager _firebaseManager;
-    public bool IsPrivacyOptionsRequire = ConsentInformation.PrivacyOptionsRequirementStatus == PrivacyOptionsRequirementStatus.Required;
-
-    private BannerView bannerView;
-
-    [Inject]
-    public void Construct(FirebaseManager firebaseManager)
-    {
-        _firebaseManager = firebaseManager;
-    }
-
-    private void Awake()
-    {
-        Logging("Admob 초기화");
-        RequestConsent();
-    }
-    // ...
-```
-
-Remove `[ManagerOrder(2)]` and `: IManager`.
-
-- [ ] **Step 2: Replace both `FirebaseManager.Instance` call sites (`CreateBanner`, `CreateInterstitial`) with `_firebaseManager`**
-
-- [ ] **Step 3: Compile and fix errors**
-
-- [ ] **Step 4: Commit**
-
-```bash
-git add Assets/Scripts/Core/AdmobManager.cs
-git commit -m "vcontainer: convert AdmobManager off singleton pattern"
-```
-
----
-
-### Task 8: Convert `GameManager` + fix its `GameLifetimeScope` registration
-
-**Files:**
-- Modify: `Assets/Scripts/Core/GameManager.cs`
-- Modify: `Assets/Scripts/GameLifetimeScope.cs`
-
-**Interfaces:**
-- Consumes: `FirebaseManager`, `InputManager`, `AddressableManager`, `PrefabManager`, `SoundManager`, `TextDataManager` (all prior tasks).
-- Produces: `GameManager` injectable via `[Inject]` in `RoundManager`, `Board`.
-
-`GameManager` currently stays a `MonoBehaviour` (it needs `OnApplicationPause`/`OnApplicationQuit`), but `GameLifetimeScope` registers it with `RegisterEntryPoint<GameManager>(...).AsSelf()` — that API expects to construct a plain C# object via reflection, which doesn't work for a `MonoBehaviour`. This task fixes that alongside the injection conversion.
-
-- [ ] **Step 1: Update `GameLifetimeScope.cs`**
-
-```csharp
-using VContainer;
-using VContainer.Unity;
-
-public class GameLifetimeScope : LifetimeScope
-{
-    protected override void Configure(IContainerBuilder builder)
-    {
-        builder.RegisterComponentOnNewGameObject<AddressableManager>(Lifetime.Singleton, nameof(AddressableManager));
-        builder.RegisterComponentOnNewGameObject<PrefabManager>(Lifetime.Singleton, nameof(PrefabManager));
-        builder.RegisterComponentOnNewGameObject<SoundManager>(Lifetime.Singleton, nameof(SoundManager));
-        builder.RegisterComponentOnNewGameObject<TextDataManager>(Lifetime.Singleton, nameof(TextDataManager));
-        builder.RegisterComponentOnNewGameObject<InputManager>(Lifetime.Singleton, nameof(InputManager));
-        builder.RegisterComponentOnNewGameObject<FirebaseManager>(Lifetime.Singleton, nameof(FirebaseManager));
-        builder.RegisterComponentOnNewGameObject<AdmobManager>(Lifetime.Singleton, nameof(AdmobManager));
-
-        builder.RegisterComponentOnNewGameObject<GameManager>(Lifetime.Singleton, nameof(GameManager))
-            .AsSelf()
-            .AsImplementedInterfaces();
-    }
-}
-```
-
-`.AsImplementedInterfaces()` is what makes VContainer discover and drive `IAsyncStartable`/`IDisposable` on `GameManager` automatically.
-
-- [ ] **Step 2: Update `GameManager.cs` class declaration and injection**
-
-```csharp
-public class GameManager : MonoBehaviour, IManager, IAsyncStartable, IDisposable
-{
-    private FirebaseManager _firebaseManager;
-    private InputManager _inputManager;
-    private AddressableManager _addressableManager;
-    private PrefabManager _prefabManager;
-    private SoundManager _soundManager;
-    private TextDataManager _textDataManager;
-
-    [Inject]
-    public void Construct(
-        FirebaseManager firebaseManager,
-        InputManager inputManager,
-        AddressableManager addressableManager,
-        PrefabManager prefabManager,
-        SoundManager soundManager,
-        TextDataManager textDataManager)
-    {
-        _firebaseManager = firebaseManager;
-        _inputManager = inputManager;
-        _addressableManager = addressableManager;
-        _prefabManager = prefabManager;
-        _soundManager = soundManager;
-        _textDataManager = textDataManager;
-    }
-
-    // HighScore / IsSymbolOn properties: replace FirebaseManager.Instance with _firebaseManager
-    // Language, _roundManager, _lobbyUI, _loadingUI, catureEnterTime fields unchanged
-```
-
-Drop `: IManager` here too, matching every other manager — final declaration: `public class GameManager : MonoBehaviour, IAsyncStartable, IDisposable`.
-
-Add `using VContainer;` to this file's `using` block for `[Inject]` (it currently only has `using VContainer.Unity;`).
-
-- [ ] **Step 3: Replace `Bootstrap()` with `StartAsync`, fill in `Dispose`**
-
-```csharp
-async public UniTask StartAsync(CancellationToken cancellation = default)
-{
-    ResolutionScreen.InitResolution();
-    _inputManager.SubscribeToInputHandler(InputType.Game_Exit, OnClickExit);
-    await UniTask.WaitUntil(() => _firebaseManager.IsInitialized, cancellationToken: cancellation);
-    _firebaseManager.Log("AddressableManager Init");
-    await _addressableManager.SetAddressable();
-    _firebaseManager.Log("PrefabManager Init");
-    await _prefabManager.LoadAssetReference();
-    _firebaseManager.Log("SoundManager Init");
-    await _soundManager.LoadAssetReference();
-    _firebaseManager.Log("TextDataManager Init");
-    await _textDataManager.LoadAssetReference();
-    _firebaseManager.Log("PrefabManager Load");
-    await _prefabManager.InitLoadObjects();
-    _firebaseManager.Log("Force Update Check");
-    await _firebaseManager.CheckForForceUpdateAsync();
-    await UniTask.WaitUntil(() => _firebaseManager?.IsUpdate ?? false, cancellationToken: cancellation);
-    _lobbyUI = await _prefabManager.InstantiateStaticUI<IBaseUI>(PrefabData.LobbyUI);
-    _loadingUI = await _prefabManager.InstantiateStaticUI<IBaseUI>(PrefabData.LoadingUI);
-    _lobbyUI.Init();
-    _loadingUI.Init();
-    await UniTask.WaitUntil(() => _firebaseManager.IsLoadData, cancellationToken: cancellation);
-    await UniTask.WaitForSeconds(2f, cancellationToken: cancellation);
-    _loadingUI.Close();
-}
-
-public void Dispose()
-{
-    // No unmanaged resources or subscriptions owned directly by GameManager need explicit teardown today;
-    // OnApplicationQuit already persists state. Left intentionally empty rather than throwing.
-}
-```
-
-- [ ] **Step 4: Replace every remaining `.Instance` call in the rest of the file** (`StartRound`, `ExitRound`, `ShowExitToast`, `OnApplicationPause`, `OnApplicationQuit`) with the injected fields (`_prefabManager`, `_firebaseManager`).
-
-- [ ] **Step 5: Add `using System;` and `using System.Threading;` if not already present** (needed for `IDisposable`, `CancellationToken`).
-
-- [ ] **Step 6: Compile and fix errors**
-
-- [ ] **Step 7: Play `Color_Brick.unity` from a clean stopped state — confirm the full boot sequence runs (lobby loads, no console errors) exactly as before**
+Play `Color_Brick.unity`. Expected: game boots exactly as before (this task changes *how* managers get `AddressableManager`, not any behavior). Watch console for `NullReferenceException` on `_addressableManager` — if you see one, double-check the `[Inject]` method is `public` and tagged `[Inject]`, and `VContainer` is imported.
 
 - [ ] **Step 8: Commit**
 
 ```bash
-git add Assets/Scripts/Core/GameManager.cs Assets/Scripts/GameLifetimeScope.cs
-git commit -m "vcontainer: convert GameManager to a properly-registered VContainer entry point"
+git add Assets/Scripts/Core
+git commit -m "Convert AddressableManager and its consumers to VContainer injection"
 ```
 
 ---
 
-### Task 9: Convert `RoundManager`, `Board`, `Brick`
+### Task 3: `PrefabManager` runtime instantiation → `IObjectResolver`
+
+This is the task that makes injection automatic for everything spawned at runtime. `PrefabManager`'s *public API stays identical* — every caller of `PrefabManager.Instance.InstantiateObject/InstantiateStaticUI/InstantiateDynamicUI` keeps working unchanged; only the internal mechanism switches from Addressables' own address-based instantiate to load-then-`resolver.Instantiate`. `PrefabManager`'s own singleton base stays — its consumers aren't converted until Tasks 4-8.
+
+**Files:**
+- Modify: `Assets/Scripts/Core/Core_Resource/IAssetResource.cs`
+- Modify: `Assets/Scripts/Core/Core_Resource/AssetReferenceBase.cs`
+- Modify: `Assets/Scripts/Core/Core_Resource/AddressableManager.cs`
+- Modify: `Assets/Scripts/Core/ReferenceManager.cs`
+- Modify: `Assets/Scripts/Core/PrefabManager.cs`
+
+**Interfaces:**
+- Consumes: `IObjectResolver` (from `VContainer`, auto-available — no explicit registration needed).
+- Produces: any object instantiated via `PrefabManager`'s helpers is now injected automatically; downstream tasks (7, 8, 9) rely on this.
+
+- [ ] **Step 1: Change `IAssetResource.InstantiateAsync` to take a resolver**
+
+`Assets/Scripts/Core/Core_Resource/IAssetResource.cs:15`
+
+```csharp
+// Before
+public UniTask<T> InstantiateAsync<T>(Transform parent);
+
+// After
+public UniTask<T> InstantiateAsync<T>(Transform parent, IObjectResolver resolver);
+```
+
+Add `using VContainer;` to the top of the file.
+
+- [ ] **Step 2: Reimplement `AssetResource.InstantiateAsync` to load-then-inject instead of Addressables' address-instantiate**
+
+`Assets/Scripts/Core/Core_Resource/AssetReferenceBase.cs:28-37`
+
+```csharp
+// Before
+public async UniTask<T1> InstantiateAsync<T1>(Transform parent)
+{
+    var handle = data.InstantiateAsync(parent);
+    await handle.ToUniTask();
+    instance = handle.Result;
+
+    if (typeof(T1) == typeof(GameObject))
+        return (T1)(object)instance;
+    return instance.GetComponent<T1>();
+}
+
+// After
+public async UniTask<T1> InstantiateAsync<T1>(Transform parent, IObjectResolver resolver)
+{
+    if (isValid == false)
+    {
+        var loadHandle = data.LoadAssetAsync();
+        await loadHandle.ToUniTask();
+    }
+
+    var prefab = data.Asset as GameObject;
+    instance = resolver.Instantiate(prefab, parent);
+
+    if (typeof(T1) == typeof(GameObject))
+        return (T1)(object)instance;
+    return instance.GetComponent<T1>();
+}
+```
+
+Add `using VContainer;` to the top of the file.
+
+**Also fix `ReleaseAsset()` in the same file** — it currently calls `data.ReleaseInstance(instance)`, which only releases instances created via Addressables' own `InstantiateAsync`. Since instances are now created via `resolver.Instantiate` (plain `Object.Instantiate` under the hood), release them the same way:
+
+```csharp
+// Before
+public void ReleaseAsset()
+{
+    if(isInstance)
+        data.ReleaseInstance(instance);
+
+    instance = null;
+}
+
+// After
+public void ReleaseAsset()
+{
+    if (isInstance)
+        UnityEngine.Object.Destroy(instance);
+
+    instance = null;
+}
+```
+
+- [ ] **Step 3: Thread the resolver through `AddressableManager.Instantiate`**
+
+`Assets/Scripts/Core/Core_Resource/AddressableManager.cs:162-174`
+
+```csharp
+// Before
+public async UniTask<T> Instantiate<T>(IAssetResource assetResource, Transform parent, bool isProtected)
+{
+    var go = await assetResource.InstantiateAsync<GameObject>(parent);
+    var obj = go.AddComponent<InstantiateObject>();
+    if (isProtected == false)
+        _instantiateHandles.Add(go);
+
+    obj.SetAssetReference(assetResource);
+
+    return go.GetComponent<T>();
+}
+
+// After
+public async UniTask<T> Instantiate<T>(IAssetResource assetResource, Transform parent, bool isProtected, IObjectResolver resolver)
+{
+    var go = await assetResource.InstantiateAsync<GameObject>(parent, resolver);
+    var obj = go.AddComponent<InstantiateObject>();
+    if (isProtected == false)
+        _instantiateHandles.Add(go);
+
+    obj.SetAssetReference(assetResource);
+
+    return go.GetComponent<T>();
+}
+```
+
+Add `using VContainer;` to the top of the file.
+
+- [ ] **Step 4: Inject `IObjectResolver` into `ReferenceManager<T>` and pass it through `InstantiateObject`**
+
+`Assets/Scripts/Core/ReferenceManager.cs` — extend the `Construct` method added in Task 2:
+
+```csharp
+// Before (from Task 2)
+protected AddressableManager _addressableManager;
+
+[Inject]
+public void Construct(AddressableManager addressableManager)
+{
+    _addressableManager = addressableManager;
+}
+
+// After
+protected AddressableManager _addressableManager;
+protected IObjectResolver _resolver;
+
+[Inject]
+public void Construct(AddressableManager addressableManager, IObjectResolver resolver)
+{
+    _addressableManager = addressableManager;
+    _resolver = resolver;
+}
+```
+
+And update the call site at the bottom of `InstantiateObject<TI>`:
+
+```csharp
+// Before
+return await _addressableManager.Instantiate<TI>(obj, parent, isProtected);
+
+// After
+return await _addressableManager.Instantiate<TI>(obj, parent, isProtected, _resolver);
+```
+
+- [ ] **Step 5: Fix `PrefabManager.InstantiateUI`'s direct call**
+
+`Assets/Scripts/Core/PrefabManager.cs:85`
+
+```csharp
+// Before
+return await _addressableManager.Instantiate<TI>(obj, parent, isProtected);
+
+// After
+return await _addressableManager.Instantiate<TI>(obj, parent, isProtected, _resolver);
+```
+
+(Both `_addressableManager` and `_resolver` are inherited protected fields from `ReferenceManager<T>` — no new fields needed in `PrefabManager`.)
+
+- [ ] **Step 6: Verify in Editor**
+
+Play `Color_Brick.unity`. Expected: lobby loads, `LegalUI` popup and every other Addressable-spawned prefab still instantiate correctly, no console errors about null prefabs or failed casts. This is the highest-risk task so far — if a UI popup fails to appear or throws, check that `data.Asset` isn't null (i.e., `LoadAssetAsync` actually completed before `resolver.Instantiate` runs).
+
+- [ ] **Step 7: Commit**
+
+```bash
+git add Assets/Scripts/Core
+git commit -m "Switch PrefabManager runtime instantiation to IObjectResolver"
+```
+
+---
+
+### Task 4: `FirebaseManager` → inject `PrefabManager`
+
+`FirebaseManager` only depends on one other manager: `PrefabManager`, used once in `ShowForceUpdatePopupAsync` to spawn the force-update popup. `FirebaseManager`'s own singleton base stays — it's still consumed via `.Instance` all over the codebase (`SoundManager`, `AdmobManager`, `GameManager`, `RoundManager`, `GameLobbyUI`), cleaned up in later tasks. This task only fixes `FirebaseManager`'s *own* internal dependency.
+
+**Files:**
+- Modify: `Assets/Scripts/Core/FirebaseManager.cs`
+
+**Interfaces:**
+- Consumes: `PrefabManager` (registered in `GameLifetimeScope` already).
+
+- [ ] **Step 1: Add the injection**
+
+Near the top of the `FirebaseManager` class body (after the existing field declarations, e.g. after `private FirebaseFirestore _firestore;`):
+
+```csharp
+private PrefabManager _prefabManager;
+
+[Inject]
+public void Construct(PrefabManager prefabManager)
+{
+    _prefabManager = prefabManager;
+}
+```
+
+Add `using VContainer;` to the top of the file.
+
+- [ ] **Step 2: Replace the one call site**
+
+`Assets/Scripts/Core/FirebaseManager.cs:576` (inside `ShowForceUpdatePopupAsync`):
+
+```csharp
+// Before
+var popup = await PrefabManager.Instance.InstantiateDynamicUI<IPopupQuestion>(PrefabData.PopupQuestionUI);
+
+// After
+var popup = await _prefabManager.InstantiateDynamicUI<IPopupQuestion>(PrefabData.PopupQuestionUI);
+```
+
+- [ ] **Step 3: Verify in Editor**
+
+Play `Color_Brick.unity`. Force-update popups are hard to trigger on demand — instead confirm the game still boots normally and no `NullReferenceException` appears around Firebase initialization in the console (a broken injection would throw as soon as `Construct` runs, at container build time, not only when the popup path executes).
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add Assets/Scripts/Core/FirebaseManager.cs
+git commit -m "Inject PrefabManager into FirebaseManager"
+```
+
+---
+
+### Task 5: `SoundManager`, `TextDataManager`, `InputManager`, `AdmobManager` → inject their own manager deps
+
+`InputManager` has no manager dependencies (leaf) — nothing to change internally, it's included here just to confirm via the same verification pass. `TextDataManager` already got its `AddressableManager` injection in Task 2. `SoundManager` needs `FirebaseManager` (it already got `AddressableManager` in Task 2). `AdmobManager` needs `FirebaseManager`. All four managers keep their own singleton bases for now — their consumers aren't converted until Tasks 6-8.
+
+**Files:**
+- Modify: `Assets/Scripts/Core/SoundManager.cs`
+- Modify: `Assets/Scripts/Core/AdmobManager.cs`
+
+**Interfaces:**
+- Consumes: `FirebaseManager` (registered in `GameLifetimeScope` already).
+
+- [ ] **Step 1: Wire `SoundManager` to receive `FirebaseManager`**
+
+`Assets/Scripts/Core/SoundManager.cs` — extend the class with a new field/method, and add `using VContainer;`:
+
+```csharp
+private FirebaseManager _firebaseManager;
+
+[Inject]
+public void ConstructFirebase(FirebaseManager firebaseManager)
+{
+    _firebaseManager = firebaseManager;
+}
+```
+
+(Named `ConstructFirebase` rather than `Construct` to avoid confusion with the base class's own `Construct(AddressableManager, IObjectResolver)` from `ReferenceManager<T>` — VContainer calls every `[Inject]`-tagged method found across the type's inheritance chain, so both run regardless of name, but distinct names keep it readable.)
+
+- [ ] **Step 2: Replace `SoundManager`'s 6 internal `FirebaseManager.Instance` uses**
+
+`Assets/Scripts/Core/SoundManager.cs:63,66,69,76,79,82,102,103,104` — the `IsBGMOn`/`IsSFXOn` properties and `LoadSaveFieldData`:
+
+```csharp
+// Before
+public bool IsBGMOn
+{
+    get { return FirebaseManager.Instance.IsBGMOn; }
+    set
+    {
+        if (FirebaseManager.Instance.IsBGMOn == value)
+            return;
+
+        FirebaseManager.Instance.IsBGMOn = value;
+        _bgmAudio.mute = !value;
+    }
+}
+
+public bool IsSFXOn
+{
+    get { return FirebaseManager.Instance.IsSFXOn; }
+    set
+    {
+        if (FirebaseManager.Instance.IsSFXOn == value)
+            return;
+
+        FirebaseManager.Instance.IsSFXOn = value;
+        _sfxAudio.mute = !value;
+    }
+}
+
+// After
+public bool IsBGMOn
+{
+    get { return _firebaseManager.IsBGMOn; }
+    set
+    {
+        if (_firebaseManager.IsBGMOn == value)
+            return;
+
+        _firebaseManager.IsBGMOn = value;
+        _bgmAudio.mute = !value;
+    }
+}
+
+public bool IsSFXOn
+{
+    get { return _firebaseManager.IsSFXOn; }
+    set
+    {
+        if (_firebaseManager.IsSFXOn == value)
+            return;
+
+        _firebaseManager.IsSFXOn = value;
+        _sfxAudio.mute = !value;
+    }
+}
+```
+
+```csharp
+// Before
+async private UniTask LoadSaveFieldData()
+{
+    await UniTask.WaitUntil(() => FirebaseManager.Instance.IsLoadData);
+    _bgmAudio.mute = !FirebaseManager.Instance.IsBGMOn;
+    _sfxAudio.mute = !FirebaseManager.Instance.IsSFXOn;
+}
+
+// After
+async private UniTask LoadSaveFieldData()
+{
+    await UniTask.WaitUntil(() => _firebaseManager.IsLoadData);
+    _bgmAudio.mute = !_firebaseManager.IsBGMOn;
+    _sfxAudio.mute = !_firebaseManager.IsSFXOn;
+}
+```
+
+- [ ] **Step 3: Wire `AdmobManager` to receive `FirebaseManager`**
+
+`Assets/Scripts/Core/AdmobManager.cs` — add near the top of the class, plus `using VContainer;`:
+
+```csharp
+private FirebaseManager _firebaseManager;
+
+[Inject]
+public void Construct(FirebaseManager firebaseManager)
+{
+    _firebaseManager = firebaseManager;
+}
+```
+
+- [ ] **Step 4: Replace `AdmobManager`'s 2 internal `FirebaseManager.Instance` uses**
+
+`Assets/Scripts/Core/AdmobManager.cs:32,48`
+
+```csharp
+// Before (CreateBanner)
+FirebaseManager.Instance.Log("Bottom Admob Banner Create");
+// After
+_firebaseManager.Log("Bottom Admob Banner Create");
+```
+
+```csharp
+// Before (CreateInterstitial)
+FirebaseManager.Instance.Log("Update High Score Admob Create");
+// After
+_firebaseManager.Log("Update High Score Admob Create");
+```
+
+- [ ] **Step 5: Verify in Editor**
+
+Play `Color_Brick.unity`. Toggle BGM/SFX in the sound settings UI (still using `SoundManager.Instance` at this point — that's fine, it's unaffected by this task) and confirm audio mute state still updates correctly. Check console for injection errors on boot.
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add Assets/Scripts/Core/SoundManager.cs Assets/Scripts/Core/AdmobManager.cs
+git commit -m "Inject FirebaseManager into SoundManager and AdmobManager"
+```
+
+---
+
+### Task 6: `GameManager` → full injection + fix broken entry-point registration
+
+`GameManager` currently has a **broken registration**: `GameLifetimeScope.cs` uses `builder.RegisterEntryPoint<GameManager>(Lifetime.Singleton).AsSelf();`, but `RegisterEntryPoint` is meant for plain C# classes — it cannot correctly construct a `MonoBehaviour`-derived type like `GameManager` (Unity doesn't allow `new MonoBehaviourSubclass()`). This task fixes that registration, converts `GameManager` to receive all 7 managers via injection, and replaces the manual `Bootstrap()` call chain with a real `IAsyncStartable`/`IDisposable` implementation (the stub methods already exist — `Dispose()` and `StartAsync()` just throw `NotImplementedException` today). `GameManager`'s own singleton base stays for now — `RoundManager` still reads `GameManager.Instance` until Task 7.
+
+**Files:**
+- Modify: `Assets/Scripts/GameLifetimeScope.cs`
+- Modify: `Assets/Scripts/Core/GameManager.cs`
+
+**Interfaces:**
+- Consumes: `AddressableManager`, `PrefabManager`, `SoundManager`, `TextDataManager`, `InputManager`, `FirebaseManager`, `AdmobManager` (all registered in `GameLifetimeScope`).
+- Produces: `GameManager` now boots itself via VContainer's `IAsyncStartable.StartAsync`, replacing the old manual `Bootstrap()` entry point.
+
+- [ ] **Step 1: Fix the registration**
+
+`Assets/Scripts/GameLifetimeScope.cs:16`
+
+```csharp
+// Before
+builder.RegisterEntryPoint<GameManager>(Lifetime.Singleton).AsSelf();
+
+// After
+builder.RegisterComponentOnNewGameObject<GameManager>(Lifetime.Singleton, nameof(GameManager)).AsSelf().AsImplementedInterfaces();
+```
+
+- [ ] **Step 2: Rewrite `GameManager.cs`**
+
+```csharp
+using Cysharp.Threading.Tasks;
+using System;
+using System.Threading;
+using UnityEngine;
+using UnityEngine.InputSystem;
+using VContainer;
+using VContainer.Unity;
+
+public class GameManager : SingletonInstance<GameManager>, IManager, IAsyncStartable, IDisposable
+{
+    private AddressableManager _addressableManager;
+    private PrefabManager _prefabManager;
+    private SoundManager _soundManager;
+    private TextDataManager _textDataManager;
+    private InputManager _inputManager;
+    private FirebaseManager _firebaseManager;
+    private AdmobManager _admobManager;
+
+    [Inject]
+    public void Construct(
+        AddressableManager addressableManager,
+        PrefabManager prefabManager,
+        SoundManager soundManager,
+        TextDataManager textDataManager,
+        InputManager inputManager,
+        FirebaseManager firebaseManager,
+        AdmobManager admobManager)
+    {
+        _addressableManager = addressableManager;
+        _prefabManager = prefabManager;
+        _soundManager = soundManager;
+        _textDataManager = textDataManager;
+        _inputManager = inputManager;
+        _firebaseManager = firebaseManager;
+        _admobManager = admobManager;
+    }
+
+    public int HighScore
+    {
+        get => _firebaseManager.ClassicScore;
+
+        set
+        {
+            if (_firebaseManager.ClassicScore == value)
+                return;
+
+            _firebaseManager.ClassicScore = value;
+        }
+    }
+    public bool IsSymbolOn
+    {
+        get => _firebaseManager.IsSymbolOn;
+
+        set
+        {
+            if (_firebaseManager.IsSymbolOn == value)
+                return;
+
+            _firebaseManager.IsSymbolOn = value;
+            _roundManager?.ChangeSymbolState();
+        }
+    }
+
+    public LanguageType Language = LanguageType.English;
+    private IRound _roundManager;
+    private IBaseUI _lobbyUI;
+    private IBaseUI _loadingUI;
+
+    public float catureEnterTime { get; set; }
+
+    async public UniTask StartAsync(CancellationToken cancellation = default)
+    {
+        ResolutionScreen.InitResolution();
+        _inputManager.SubscribeToInputHandler(InputType.Game_Exit, OnClickExit);
+        await UniTask.WaitUntil(() => _firebaseManager.IsInitialized, cancellationToken: cancellation);
+        _firebaseManager.Log("AddressableManager Init");
+        await _addressableManager.SetAddressable();
+        _firebaseManager.Log("PrefabManager Init");
+        await _prefabManager.LoadAssetReference();
+        _firebaseManager.Log("SoundManager Init");
+        await _soundManager.LoadAssetReference();
+        _firebaseManager.Log("TextDataManager Init");
+        await _textDataManager.LoadAssetReference();
+        _firebaseManager.Log("PrefabManager Load");
+        await _prefabManager.InitLoadObjects();
+        _firebaseManager.Log("Force Update Check");
+        await _firebaseManager.CheckForForceUpdateAsync();
+        await UniTask.WaitUntil(() => _firebaseManager?.IsUpdate ?? false, cancellationToken: cancellation);
+        _lobbyUI = await _prefabManager.InstantiateStaticUI<IBaseUI>(PrefabData.LobbyUI);
+        _loadingUI = await _prefabManager.InstantiateStaticUI<IBaseUI>(PrefabData.LoadingUI);
+        _lobbyUI.Init();
+        _loadingUI.Init();
+        await UniTask.WaitUntil(() => _firebaseManager.IsLoadData, cancellationToken: cancellation);
+        await UniTask.WaitForSeconds(2f, cancellationToken: cancellation);
+        _loadingUI.Close();
+    }
+
+    async public UniTask StartRound()
+    {
+        if (_roundManager == null)
+        {
+            _roundManager = await _prefabManager.InstantiateObject<IRound>(PrefabData.RoundManager);
+            await _roundManager.Init();
+        }
+        _lobbyUI.Close();
+        _roundManager.EnterRound();
+    }
+
+    public void ExitRound()
+    {
+        if (_roundManager == null)
+            return;
+
+        _roundManager.ExitRound();
+        _roundManager = null;
+        _lobbyUI.Init();
+    }
+
+    private void OnClickExit(InputAction.CallbackContext callback)
+    {
+        ShowExitToast().Forget();
+    }
+
+    async private UniTask ShowExitToast()
+    {
+#if UNITY_ANDROID || UNITY_EDITOR
+        if (_prefabManager.TryGetInstance<IPopupQuestion>(PrefabData.PopupQuestionUI, out IPopupQuestion popup))
+            return;
+        popup = await _prefabManager.InstantiateDynamicUI<IPopupQuestion>(PrefabData.PopupQuestionUI);
+
+        popup.SetNoticeContent(GameTextData.POPUP_EXIT_GAME);
+        popup.RegistQuestionAction(QuitGame);
+#endif
+
+    }
+
+    private void QuitGame()
+    {
+        ExitRound();
+        Application.Quit();
+    }
+
+    private void OnApplicationPause(bool pause)
+    {
+        if (!pause)
+            return;
+
+        PlayerPrefs.Save();
+
+        if (_roundManager != null)
+            _firebaseManager.LogModePause("Classic", Time.realtimeSinceStartup - catureEnterTime, _roundManager.CurrentScore);
+
+        _firebaseManager.Log("App paused");
+    }
+
+    private void OnApplicationQuit()
+    {
+        PlayerPrefs.Save();
+        _firebaseManager.LogEvent("app_quit", "real_time", Time.realtimeSinceStartup.ToString());
+    }
+
+    public void Dispose()
+    {
+        _inputManager.UnsubscribeToInputHandler(InputType.Game_Exit, OnClickExit);
+    }
+}
+```
+
+Notes on the rewrite:
+- `StartAsync` replaces the old `Bootstrap()` method one-for-one (same body, `.Instance` calls swapped for injected fields) — VContainer calls `StartAsync` automatically once the container finishes building, so nothing needs to call it manually anymore.
+- `Dispose()` previously threw `NotImplementedException`; it now does the one thing that's safe and obviously correct to undo — unsubscribing the input handler that `StartAsync` subscribed. Don't invent additional cleanup here; the point is to stop throwing, not to guess at unrelated teardown.
+- `_admobManager` is stored but unused directly in `GameManager` today (nothing in the original code called it there either) — keep the field; `GameOverUI` still calls `AdmobManager.Instance` until Task 8.
+
+- [ ] **Step 3: Verify in Editor**
+
+Play `Color_Brick.unity`. This is the biggest verification checkpoint so far:
+- Game boots without console errors.
+- Lobby UI appears, loading UI closes after ~2s once Firebase data loads.
+- Press whatever triggers `Game_Exit` input — exit popup should appear (existing `PrefabManager.Instance` calls inside `RoundManager`/UI still work, unaffected by this task).
+- Stop Play mode — confirm no exception is thrown from `Dispose()`.
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add Assets/Scripts/GameLifetimeScope.cs Assets/Scripts/Core/GameManager.cs
+git commit -m "Fix GameManager VContainer registration and convert to injection"
+```
+
+---
+
+### Task 7: `RoundManager` → `Board` → `Brick`
 
 **Files:**
 - Modify: `Assets/Scripts/Game/RoundManager.cs`
 - Modify: `Assets/Scripts/Game/Board.cs`
 
-**Interfaces:**
-- Consumes: `PrefabManager`, `GameManager`, `FirebaseManager`, `InputManager`, `SoundManager` (all prior tasks). Spawned via `PrefabManager.InstantiateObject<RoundObject>` → `AddressableManager.Instantiate<T>`, which now auto-injects (Task 1).
-- Note: `Brick.cs` has no `.Instance` calls (only a commented-out `GameManager.Instance` line) — no changes needed; it will still be auto-injected harmlessly if VContainer's `InjectGameObject` finds no `[Inject]` methods on it.
+`Brick.cs` needs no changes — its only manager reference is a commented-out line (`//_symbol.gameObject.SetActive(GameManager.Instance.IsSymbolOn);`), not live code.
 
-- [ ] **Step 1: Update `RoundManager.cs`**
+**Interfaces:**
+- Consumes: `PrefabManager`, `FirebaseManager`, `GameManager`, `InputManager`, `SoundManager` — available automatically since both classes are only ever created via `PrefabManager`'s `InstantiateObject`/`InstantiateStaticUI`/`InstantiateDynamicUI`, which now go through `IObjectResolver.Instantiate` (Task 3).
+
+- [ ] **Step 1: Wire `RoundManager`**
+
+`Assets/Scripts/Game/RoundManager.cs`:
 
 ```csharp
 using Cysharp.Threading.Tasks;
 using System;
+using UnityEngine;
 using VContainer;
 
 public class RoundManager : MonoBehaviour, IRound
 {
-    public int CurrentScore => _scoreValue;
-    public event Action OnUpdateSymbolState;
-    private const float COMBO_DELAY = 5f;
-    private RoundObject _board;
-    private IScore _ingameUI;
-    private IScore _gameOver;
     private PrefabManager _prefabManager;
     private FirebaseManager _firebaseManager;
     private GameManager _gameManager;
-
-    private int _scoreValue = 0;
-    private int _comboValue = 0;
-    private int _maxCombo = 0;
-    private TimerModule _timer;
 
     [Inject]
     public void Construct(PrefabManager prefabManager, FirebaseManager firebaseManager, GameManager gameManager)
@@ -829,6 +927,18 @@ public class RoundManager : MonoBehaviour, IRound
         _firebaseManager = firebaseManager;
         _gameManager = gameManager;
     }
+
+    public int CurrentScore => _scoreValue;
+    public event Action OnUpdateSymbolState;
+    private const float COMBO_DELAY = 5f;
+    private RoundObject _board;
+    private IScore _ingameUI;
+    private IScore _gameOver;
+
+    private int _scoreValue = 0;
+    private int _comboValue = 0;
+    private int _maxCombo = 0;
+    private TimerModule _timer;
 
     async public UniTask Init()
     {
@@ -911,14 +1021,11 @@ public class RoundManager : MonoBehaviour, IRound
 }
 ```
 
-(Add `using UnityEngine;` if the original file relied on an implicit global import — check the existing `using` block; it already has it.)
+- [ ] **Step 2: Wire `Board`**
 
-- [ ] **Step 2: Update `Board.cs`**
-
-Add fields + injection, and replace the 6 `.Instance` call sites (`Awake`, `OnDestroy`, `InitBrick`, `SlideBrick`, `DestroyMatches`):
+`Assets/Scripts/Game/Board.cs` — add near the top of the class (right after the existing field declarations, before `_boardDirection`):
 
 ```csharp
-// add near the top of the class, alongside the other private fields:
 private InputManager _inputManager;
 private SoundManager _soundManager;
 private PrefabManager _prefabManager;
@@ -932,66 +1039,84 @@ public void Construct(InputManager inputManager, SoundManager soundManager, Pref
 }
 ```
 
+Add `using VContainer;` to the top of the file.
+
+Then replace every `.Instance` call site in the same file:
+
 ```csharp
-// Awake()
-private void Awake()
-{
-    _inputManager.SubscribeToInputHandler(InputType.Player_Touch, OnTouchPoint, cancel: OnEndTouchPoint);
-    _inputManager.SubscribeToInputHandler(InputType.Player_Point, perform: OnDragPoint);
-
-    _bricks.Clear();
-}
-
-// OnDestroy()
-private void OnDestroy()
-{
-    ResetToken();
-    _inputManager.UnsubscribeToInputHandler(InputType.Player_Touch, OnTouchPoint, cancel: OnEndTouchPoint);
-    _inputManager.UnsubscribeToInputHandler(InputType.Player_Point, perform: OnDragPoint);
-}
+// Awake() — before
+InputManager.Instance.SubscribeToInputHandler(InputType.Player_Touch, OnTouchPoint, cancel: OnEndTouchPoint);
+InputManager.Instance.SubscribeToInputHandler(InputType.Player_Point, perform: OnDragPoint);
+// after
+_inputManager.SubscribeToInputHandler(InputType.Player_Touch, OnTouchPoint, cancel: OnEndTouchPoint);
+_inputManager.SubscribeToInputHandler(InputType.Player_Point, perform: OnDragPoint);
 ```
 
 ```csharp
-// InitBrick(): PrefabManager.Instance.InstantiateObject<Brick>(...) -> _prefabManager.InstantiateObject<Brick>(...)
-// SlideBrick(): SoundManager.Instance.PlaySFX(SoundData.Slide) -> _soundManager.PlaySFX(SoundData.Slide)
-// DestroyMatches(): SoundManager.Instance.PlaySFX(SoundData.Match) -> _soundManager.PlaySFX(SoundData.Match)
+// OnDestroy() — before
+InputManager.Instance.UnsubscribeToInputHandler(InputType.Player_Touch, OnTouchPoint, cancel: OnEndTouchPoint);
+InputManager.Instance.UnsubscribeToInputHandler(InputType.Player_Point, perform: OnDragPoint);
+// after
+_inputManager.UnsubscribeToInputHandler(InputType.Player_Touch, OnTouchPoint, cancel: OnEndTouchPoint);
+_inputManager.UnsubscribeToInputHandler(InputType.Player_Point, perform: OnDragPoint);
 ```
 
-Add `using VContainer;` to `Board.cs`'s using block.
+```csharp
+// InitBrick() — before
+var brick = await PrefabManager.Instance.InstantiateObject<Brick>(PrefabData.Brick, this.transform);
+// after
+var brick = await _prefabManager.InstantiateObject<Brick>(PrefabData.Brick, this.transform);
+```
 
-- [ ] **Step 3: Compile and fix errors**
+```csharp
+// SlideBrick() — before
+await SoundManager.Instance.PlaySFX(SoundData.Slide);
+// after
+await _soundManager.PlaySFX(SoundData.Slide);
+```
 
-- [ ] **Step 4: Play `Color_Brick.unity`, start a round, confirm input (touch/drag), sound (slide/match SFX), scoring, and combo vibration all still work, then trigger game over**
+```csharp
+// DestroyMatches() — before
+await SoundManager.Instance.PlaySFX(SoundData.Match);
+// after
+await _soundManager.PlaySFX(SoundData.Match);
+```
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 3: Verify in Editor**
+
+Play `Color_Brick.unity`, start a round. Confirm: bricks spawn, touch/drag input still slides the board, slide/match SFX play, combo and score update, ending the round shows the game-over screen correctly. This is the first real end-to-end proof that `resolver.Instantiate` injection works on a runtime-spawned object graph (`RoundManager` spawning `Board` spawning `Brick`).
+
+- [ ] **Step 4: Commit**
 
 ```bash
 git add Assets/Scripts/Game/RoundManager.cs Assets/Scripts/Game/Board.cs
-git commit -m "vcontainer: convert RoundManager and Board off singleton pattern"
+git commit -m "Convert RoundManager and Board to VContainer injection"
 ```
 
 ---
 
-### Task 10: Convert the UI layer
+### Task 8: UI layer sweep
+
+10 files, same pattern each time: add a `[Inject] Construct(...)` method for whatever managers the file uses, then replace the `.Instance` call sites. All of these are spawned via `PrefabManager` (Task 3), so injection is automatic once the field/method exists. After this task, every consumer of every manager's `.Instance` has been converted — Task 9 becomes the "prove it" checkpoint before Task 10 strips the singleton bases.
 
 **Files:**
 - Modify: `Assets/Scripts/UI/GameLobbyUI.cs`
 - Modify: `Assets/Scripts/UI/GameOverUI.cs`
 - Modify: `Assets/Scripts/UI/InGameUI.cs`
-- Modify: `Assets/Scripts/UI/MenuUI.cs`
 - Modify: `Assets/Scripts/UI/InquriyUI.cs`
-- Modify: `Assets/Scripts/UI/PopupQuestionUI.cs`
+- Modify: `Assets/Scripts/UI/MenuUI.cs`
 - Modify: `Assets/Scripts/UI/PopupNoticeUI.cs`
+- Modify: `Assets/Scripts/UI/PopupQuestionUI.cs`
 - Modify: `Assets/Scripts/UI/SoundSettingUI.cs`
 - Modify: `Assets/Scripts/UI/IngameScoreUI.cs`
 - Modify: `Assets/Scripts/UI/TextHandler.cs`
 
 **Interfaces:**
-- Consumes: `SoundManager`, `PrefabManager`, `FirebaseManager`, `AdmobManager`, `InputManager`, `TextDataManager` (all prior tasks). All these components are spawned via `PrefabManager`'s `InstantiateDynamicUI`/`InstantiateStaticUI` → `AddressableManager.Instantiate<T>`, so `[Inject]` methods on them are called automatically the same way as Task 9.
+- Consumes: `SoundManager`, `PrefabManager`, `FirebaseManager`, `TextDataManager`, `InputManager`, `AdmobManager`.
 
-Same mechanical pattern for every file: add `using VContainer;`, add private fields + one `[Inject] Construct(...)` method, replace `X.Instance` with the injected field.
+- [ ] **Step 1: `GameLobbyUI.cs`**
 
-- [ ] **Step 1: `GameLobbyUI.cs`** — needs `SoundManager`, `PrefabManager`, `FirebaseManager`
+Add near the top of the class:
 
 ```csharp
 private SoundManager _soundManager;
@@ -1006,33 +1131,93 @@ public void Construct(SoundManager soundManager, PrefabManager prefabManager, Fi
     _firebaseManager = firebaseManager;
 }
 ```
-Replace: `SoundManager.Instance.PlayBGM(SoundData.Lobby)` → `_soundManager.PlayBGM(SoundData.Lobby)`; `PrefabManager.Instance.InstantiateDynamicUI<IBaseUI>(PrefabData.LegalUI)` → `_prefabManager.InstantiateDynamicUI<IBaseUI>(PrefabData.LegalUI)`; `FirebaseManager.Instance.ShowLeaderboardUI()` → `_firebaseManager.ShowLeaderboardUI()`; `PrefabManager.Instance.MainCanvas` → `_prefabManager.MainCanvas`.
 
-- [ ] **Step 2: `GameOverUI.cs`** — needs `SoundManager`, and `AdmobManager` guarded by the same `#if UNITY_ANDROID || UNITY_EDITOR` the call site already uses
+Add `using VContainer;`. Replace call sites:
+
+```csharp
+// Init() — before
+SoundManager.Instance.PlayBGM(SoundData.Lobby).Forget();
+// after
+_soundManager.PlayBGM(SoundData.Lobby).Forget();
+```
+
+```csharp
+// InitLoadUI() — before
+_legalUI = await PrefabManager.Instance.InstantiateDynamicUI<IBaseUI>(PrefabData.LegalUI);
+// after
+_legalUI = await _prefabManager.InstantiateDynamicUI<IBaseUI>(PrefabData.LegalUI);
+```
+
+```csharp
+// OnCLickLeaderboard() — before
+FirebaseManager.Instance.ShowLeaderboardUI().Forget();
+// after
+_firebaseManager.ShowLeaderboardUI().Forget();
+```
+
+```csharp
+// ChangeResolution() — before
+var canvasHeight = PrefabManager.Instance.MainCanvas.rect.height;
+// after
+var canvasHeight = _prefabManager.MainCanvas.rect.height;
+```
+
+- [ ] **Step 2: `GameOverUI.cs`**
+
+Add near the top of the class:
 
 ```csharp
 private SoundManager _soundManager;
-#if UNITY_ANDROID || UNITY_EDITOR
-private AdmobManager _admobManager;
-#endif
 
 [Inject]
-public void Construct(
-    SoundManager soundManager
-#if UNITY_ANDROID || UNITY_EDITOR
-    , AdmobManager admobManager
-#endif
-    )
+public void Construct(SoundManager soundManager)
 {
     _soundManager = soundManager;
-#if UNITY_ANDROID || UNITY_EDITOR
-    _admobManager = admobManager;
-#endif
 }
 ```
-Replace: `SoundManager.Instance.PlayBGM()` → `_soundManager.PlayBGM()`; `SoundManager.Instance.PlaySFX(SoundData.Confetti)` → `_soundManager.PlaySFX(SoundData.Confetti)`; `AdmobManager.Instance.CreateInterstitial(2f)` → `_admobManager.CreateInterstitial(2f)`.
 
-- [ ] **Step 3: `InGameUI.cs`** — needs `SoundManager`, `PrefabManager`
+Add `using VContainer;`. Replace call sites (note `AdmobManager.Instance` stays untouched here — see the note below):
+
+```csharp
+// Init() — before
+SoundManager.Instance.PlayBGM().Forget();
+// after
+_soundManager.PlayBGM().Forget();
+```
+
+```csharp
+// UpdateHighScore() — before
+SoundManager.Instance.PlaySFX(SoundData.Confetti).Forget();
+// after
+_soundManager.PlaySFX(SoundData.Confetti).Forget();
+```
+
+`AdmobManager.Instance.CreateInterstitial(2f).Forget();` inside `UpdateHighScore()` lives inside a method that's never called (`UpdateHighScore` is only invoked from the commented-out body of `SetScore`). Because it's dead code, Task 10's grep will still flag this literal string — so add the injection now (it costs nothing) rather than leaving a grep exception to explain later:
+
+```csharp
+private AdmobManager _admobManager;
+
+[Inject]
+public void ConstructAdmob(AdmobManager admobManager)
+{
+    _admobManager = admobManager;
+}
+```
+
+```csharp
+// UpdateHighScore() — before
+#if UNITY_ANDROID || UNITY_EDITOR
+        AdmobManager.Instance.CreateInterstitial(2f).Forget();
+#endif
+// after
+#if UNITY_ANDROID || UNITY_EDITOR
+        _admobManager.CreateInterstitial(2f).Forget();
+#endif
+```
+
+- [ ] **Step 3: `InGameUI.cs`**
+
+Add near the top of the class:
 
 ```csharp
 private SoundManager _soundManager;
@@ -1045,24 +1230,30 @@ public void Construct(SoundManager soundManager, PrefabManager prefabManager)
     _prefabManager = prefabManager;
 }
 ```
-Replace: `SoundManager.Instance.PlayBGM(SoundData.Ingame)` → `_soundManager.PlayBGM(SoundData.Ingame)`; both `PrefabManager.Instance.InstantiateDynamicUI<...>` calls → `_prefabManager.InstantiateDynamicUI<...>`.
 
-- [ ] **Step 4: `MenuUI.cs`** — needs `InputManager`, `PrefabManager`
+Add `using VContainer;`. Replace call sites:
 
 ```csharp
-private InputManager _inputManager;
-private PrefabManager _prefabManager;
-
-[Inject]
-public void Construct(InputManager inputManager, PrefabManager prefabManager)
-{
-    _inputManager = inputManager;
-    _prefabManager = prefabManager;
-}
+// Init() — before
+SoundManager.Instance.PlayBGM(SoundData.Ingame).Forget();
+// after
+_soundManager.PlayBGM(SoundData.Ingame).Forget();
 ```
-Replace: both `InputManager.Instance.UseInputHandler` reads/writes → `_inputManager.UseInputHandler`; `PrefabManager.Instance.InstantiateDynamicUI<IBaseUI>(PrefabData.InquriyUI, this.transform)` → `_prefabManager.InstantiateDynamicUI<IBaseUI>(PrefabData.InquriyUI, this.transform)`.
 
-- [ ] **Step 5: `InquriyUI.cs`** — needs `FirebaseManager`, `PrefabManager`
+```csharp
+// InitLoadUI() — before
+_scoreUI = await PrefabManager.Instance.InstantiateDynamicUI<IScore>(PrefabData.IngameScoreUI);
+...
+_menuUI = await PrefabManager.Instance.InstantiateDynamicUI<IBaseUI>(PrefabData.MenuUI);
+// after
+_scoreUI = await _prefabManager.InstantiateDynamicUI<IScore>(PrefabData.IngameScoreUI);
+...
+_menuUI = await _prefabManager.InstantiateDynamicUI<IBaseUI>(PrefabData.MenuUI);
+```
+
+- [ ] **Step 4: `InquriyUI.cs`**
+
+Add near the top of the class:
 
 ```csharp
 private FirebaseManager _firebaseManager;
@@ -1075,9 +1266,83 @@ public void Construct(FirebaseManager firebaseManager, PrefabManager prefabManag
     _prefabManager = prefabManager;
 }
 ```
-Replace: `FirebaseManager.Instance.SendInquiryAsync(...)` → `_firebaseManager.SendInquiryAsync(...)`; `PrefabManager.Instance.InstantiateDynamicUI<IPopupNotice>(PrefabData.PopupNoticeUI)` → `_prefabManager.InstantiateDynamicUI<IPopupNotice>(PrefabData.PopupNoticeUI)`.
 
-- [ ] **Step 6: `PopupQuestionUI.cs`** — needs `InputManager`, `TextDataManager`
+Add `using VContainer;`. Replace call sites in `SendInquiry()`:
+
+```csharp
+// Before
+var ret = await FirebaseManager.Instance.SendInquiryAsync(_content.text, _email.text);
+var popup = await PrefabManager.Instance.InstantiateDynamicUI<IPopupNotice>(PrefabData.PopupNoticeUI);
+// After
+var ret = await _firebaseManager.SendInquiryAsync(_content.text, _email.text);
+var popup = await _prefabManager.InstantiateDynamicUI<IPopupNotice>(PrefabData.PopupNoticeUI);
+```
+
+- [ ] **Step 5: `MenuUI.cs`**
+
+Add near the top of the class:
+
+```csharp
+private InputManager _inputManager;
+private PrefabManager _prefabManager;
+
+[Inject]
+public void Construct(InputManager inputManager, PrefabManager prefabManager)
+{
+    _inputManager = inputManager;
+    _prefabManager = prefabManager;
+}
+```
+
+Add `using VContainer;`. Replace call sites:
+
+```csharp
+// Init() — before
+InputManager.Instance.UseInputHandler = false;
+// after
+_inputManager.UseInputHandler = false;
+```
+
+```csharp
+// InitLoadUI() — before
+_inquriyUI = await PrefabManager.Instance.InstantiateDynamicUI<IBaseUI>(PrefabData.InquriyUI, this.transform);
+// after
+_inquriyUI = await _prefabManager.InstantiateDynamicUI<IBaseUI>(PrefabData.InquriyUI, this.transform);
+```
+
+```csharp
+// OnClickCloseBtn() — before
+InputManager.Instance.UseInputHandler = true;
+// after
+_inputManager.UseInputHandler = true;
+```
+
+- [ ] **Step 6: `PopupNoticeUI.cs`**
+
+Add near the top of the class:
+
+```csharp
+private TextDataManager _textDataManager;
+
+[Inject]
+public void Construct(TextDataManager textDataManager)
+{
+    _textDataManager = textDataManager;
+}
+```
+
+Add `using VContainer;`. Replace the call site in `SetNoticeContent`:
+
+```csharp
+// Before
+_content.text = TextDataManager.Instance.GetGameText(content);
+// After
+_content.text = _textDataManager.GetGameText(content);
+```
+
+- [ ] **Step 7: `PopupQuestionUI.cs`**
+
+Add near the top of the class:
 
 ```csharp
 private InputManager _inputManager;
@@ -1090,22 +1355,33 @@ public void Construct(InputManager inputManager, TextDataManager textDataManager
     _textDataManager = textDataManager;
 }
 ```
-Replace: both `InputManager.Instance.SubscribeToInputHandler`/`UnsubscribeToInputHandler` → injected field; `TextDataManager.Instance.GetGameText(content)` → `_textDataManager.GetGameText(content)`.
 
-- [ ] **Step 7: `PopupNoticeUI.cs`** — needs `TextDataManager`
+Add `using VContainer;`. Replace call sites:
 
 ```csharp
-private TextDataManager _textDataManager;
-
-[Inject]
-public void Construct(TextDataManager textDataManager)
-{
-    _textDataManager = textDataManager;
-}
+// Init() — before
+InputManager.Instance.SubscribeToInputHandler(InputType.Game_Exit, OnClickBackKey);
+// after
+_inputManager.SubscribeToInputHandler(InputType.Game_Exit, OnClickBackKey);
 ```
-Replace: `TextDataManager.Instance.GetGameText(content)` → `_textDataManager.GetGameText(content)`.
 
-- [ ] **Step 8: `SoundSettingUI.cs`** — needs `SoundManager`
+```csharp
+// Close() — before
+InputManager.Instance.UnsubscribeToInputHandler(InputType.Game_Exit, OnClickBackKey);
+// after
+_inputManager.UnsubscribeToInputHandler(InputType.Game_Exit, OnClickBackKey);
+```
+
+```csharp
+// SetNoticeContent() — before
+_content.text = TextDataManager.Instance.GetGameText(content);
+// after
+_content.text = _textDataManager.GetGameText(content);
+```
+
+- [ ] **Step 8: `SoundSettingUI.cs`**
+
+Add near the top of the class:
 
 ```csharp
 private SoundManager _soundManager;
@@ -1116,9 +1392,37 @@ public void Construct(SoundManager soundManager)
     _soundManager = soundManager;
 }
 ```
-Replace all 4 `SoundManager.Instance.*` reads/writes (`IsBGMOn` get/set, `IsSFXOn` get/set) → `_soundManager.*`.
 
-- [ ] **Step 9: `IngameScoreUI.cs`** — needs `PrefabManager`
+Add `using VContainer;`. Replace call sites:
+
+```csharp
+// Awake() — before
+_bgmToggle.SetValueWithoutNotify(SoundManager.Instance.IsBGMOn);
+_sfxToggle.SetValueWithoutNotify(SoundManager.Instance.IsSFXOn);
+// after
+_bgmToggle.SetValueWithoutNotify(_soundManager.IsBGMOn);
+_sfxToggle.SetValueWithoutNotify(_soundManager.IsSFXOn);
+```
+
+```csharp
+// OnBGMToggleChanged() — before
+SoundManager.Instance.IsBGMOn = value;
+// after
+_soundManager.IsBGMOn = value;
+```
+
+```csharp
+// OnSFXToggleChanged() — before
+SoundManager.Instance.IsSFXOn = value;
+// after
+_soundManager.IsSFXOn = value;
+```
+
+**Important:** `SoundSettingUI` is a plain `MonoBehaviour`. Check in the Editor whether it's spawned through `PrefabManager` (as part of some other UI prefab's hierarchy — in which case injection reaches it automatically) or placed directly as a static object in `Color_Brick.unity`. If it's scene-placed, `[Inject]` alone won't run — add `builder.RegisterComponentInHierarchy<SoundSettingUI>();` to `GameLifetimeScope.Configure`.
+
+- [ ] **Step 9: `IngameScoreUI.cs`**
+
+Add near the top of the class:
 
 ```csharp
 private PrefabManager _prefabManager;
@@ -1129,9 +1433,17 @@ public void Construct(PrefabManager prefabManager)
     _prefabManager = prefabManager;
 }
 ```
-Replace: `PrefabManager.Instance.MainCanvas` → `_prefabManager.MainCanvas` (in `ChangeResolution`).
 
-- [ ] **Step 10: `TextHandler.cs`** — needs `TextDataManager`
+Add `using VContainer;`. Replace the call site in `ChangeResolution`:
+
+```csharp
+// Before
+var canvasHeight = PrefabManager.Instance.MainCanvas.rect.height;
+// After
+var canvasHeight = _prefabManager.MainCanvas.rect.height;
+```
+
+- [ ] **Step 10: `TextHandler.cs`**
 
 ```csharp
 using TMPro;
@@ -1142,6 +1454,7 @@ public class TextHandler : MonoBehaviour
 {
     [SerializeField] private GameTextData _textData;
     [SerializeField] private TextMeshProUGUI _handler;
+
     private TextDataManager _textDataManager;
 
     [Inject]
@@ -1157,71 +1470,233 @@ public class TextHandler : MonoBehaviour
 }
 ```
 
-- [ ] **Step 11: Add `using VContainer;` to every file touched in this task that doesn't already have it**
+**Important:** like `SoundSettingUI`, check whether any `TextHandler` instance sits on a GameObject placed directly in `Color_Brick.unity` rather than inside a prefab spawned via `PrefabManager`. If so, add `builder.RegisterComponentInHierarchy<TextHandler>();` to `GameLifetimeScope`.
 
-- [ ] **Step 12: Compile and fix errors**
+- [ ] **Step 11: Verify in Editor**
 
-- [ ] **Step 13: Play `Color_Brick.unity` end to end** — lobby (BGM, leaderboard button, legal popup), start a round, in-round menu (symbol toggle, sound settings, inquiry form), game over screen (score, combo, retry/home), force-update popup if applicable. Confirm no console errors.
+Play `Color_Brick.unity` and walk through every screen touched in this task: lobby (leaderboard button, resolution change), start a round → menu (symbol toggle, inquiry), sound settings toggles, game over screen, inquiry send flow. Confirm no console errors and all text renders (proves `TextDataManager` injection reached every `TextHandler`/popup).
 
-- [ ] **Step 14: Commit**
+- [ ] **Step 12: Commit**
 
 ```bash
-git add Assets/Scripts/UI/GameLobbyUI.cs Assets/Scripts/UI/GameOverUI.cs Assets/Scripts/UI/InGameUI.cs Assets/Scripts/UI/MenuUI.cs Assets/Scripts/UI/InquriyUI.cs Assets/Scripts/UI/PopupQuestionUI.cs Assets/Scripts/UI/PopupNoticeUI.cs Assets/Scripts/UI/SoundSettingUI.cs Assets/Scripts/UI/IngameScoreUI.cs Assets/Scripts/UI/TextHandler.cs
-git commit -m "vcontainer: convert UI layer off singleton pattern"
+git add Assets/Scripts/UI
+git commit -m "Convert UI layer to VContainer injection"
 ```
 
 ---
 
-### Task 11: Delete `Bootstrap.cs` and remove dead singleton machinery
+### Task 9: `SoundEmitter` → injection
+
+`SoundEmitter` isn't instantiated from any script in this codebase (no reference to it outside its own file) — it's a component added directly to prefabs/scene objects in the Unity Inspector. Whether it needs `RegisterComponentInHierarchy` depends on where it actually lives.
 
 **Files:**
-- Delete: `Assets/Scripts/Bootstrap.cs` (and its `.meta`)
-- Delete: `Assets/Scripts/Core/Interface/IManager.cs` (and its `.meta`)
-- Delete: `Assets/Scripts/Core/Attribute/ManagerOrderAttribute.cs` (and its `.meta`)
-- Delete: `Assets/Scripts/Share/SingletonInstance.cs` (and its `.meta`)
+- Modify: `Assets/Scripts/Core/Sound/SoundEmitter.cs`
 
 **Interfaces:**
-- Consumes: every manager task above must already have `IManager`/`[ManagerOrder(N)]` removed from its declaration (Tasks 1–8) — this task only removes the now-unreferenced definitions.
+- Consumes: `SoundManager`.
 
-- [ ] **Step 1: Confirm zero remaining references before deleting**
+- [ ] **Step 1: Check where `SoundEmitter` components live**
 
-```bash
-grep -rn "IManager\|ManagerOrder\|SingletonInstance" Assets/Scripts --include=*.cs
+In the Unity Editor, check likely UI button prefabs for a `SoundEmitter` component. Note whether they're:
+- (a) children of prefabs spawned via `PrefabManager` (e.g. a button inside `MenuUI` or `GameLobbyUI`), or
+- (b) placed directly in `Color_Brick.unity`'s static hierarchy.
+
+- [ ] **Step 2: Wire the injection**
+
+```csharp
+using Cysharp.Threading.Tasks;
+using UnityEngine;
+using VContainer;
+using static SoundManager;
+
+[RequireComponent(typeof(AudioSource))]
+public class SoundEmitter : MonoBehaviour
+{
+    [SerializeField] private SoundData _soundType;
+    private AudioSource _audioSource;
+    private float _initVolum;
+    private SoundManager _soundManager;
+
+    [Inject]
+    public void Construct(SoundManager soundManager)
+    {
+        _soundManager = soundManager;
+    }
+
+    private void Awake()
+    {
+        _audioSource = GetComponent<AudioSource>();
+        _initVolum = _audioSource.volume;
+        SetAudioClip().Forget();
+        _soundManager.SubscribeToSoundHandler(UpdateVolum);
+    }
+
+    async private UniTask SetAudioClip()
+    {
+        //_audioSource.clip = await SoundManager.Instance.LoadAudioClip(_soundType);
+    }
+
+    private void OnDestroy()
+    {
+        _soundManager?.UnsubscribeToSoundHandler(UpdateVolum);
+    }
+
+    private void UpdateVolum(float volumPer)
+    {
+        _audioSource.volume = _initVolum * volumPer;
+    }
+
+    public void PlaySound()
+    {
+        _audioSource.Play();
+    }
+
+    public void FadeSound(float value, float duration)
+    {
+        //SoundManager.Instance.FadeSound(_audioSource, value, duration);
+    }
+}
 ```
 
-Expected: no matches (every manager's declaration was already cleaned up in its own task). If anything shows up, finish converting that file before proceeding.
+Note: the old `OnDestroy` guarded with `SoundManager.IsCreatedInstance()` (a check that only made sense against the static singleton). With injection, `_soundManager` is simply null if `Awake` never ran (object destroyed before injection, or never spawned through a container path) — the `?.` null-conditional covers that case equivalently.
 
-- [ ] **Step 2: Delete `Bootstrap.cs`**
+- [ ] **Step 3: If Step 1 found scene-placed instances, register them**
 
-Also find and remove the `GameObject` in `Color_Brick.unity` that carries the `Bootstrap` component (if any) — Unity will otherwise show a missing-script warning on that GameObject when the scene loads. Open the scene, search the Hierarchy for a `Bootstrap` object, delete it. `GameLifetimeScope`'s own GameObject (with `autoRun` enabled, which is the VContainer default) now does everything `Bootstrap.cs` used to do.
+`Assets/Scripts/GameLifetimeScope.cs`, inside `Configure`:
 
-- [ ] **Step 3: Delete `IManager.cs`, `ManagerOrderAttribute.cs`, `SingletonInstance.cs`**
+```csharp
+builder.RegisterComponentInHierarchy<SoundEmitter>();
+```
 
-- [ ] **Step 4: Compile and fix errors**
+Skip this step if every `SoundEmitter` lives inside a prefab spawned via `PrefabManager` — those get injected automatically.
+
+- [ ] **Step 4: Verify in Editor**
+
+Play `Color_Brick.unity`, trigger whatever UI action plays a `SoundEmitter` sound (e.g. a button click), confirm it plays and volume responds to the sound settings toggle from Task 8.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add -A Assets/Scripts/Bootstrap.cs* Assets/Scripts/Core/Interface/IManager.cs* Assets/Scripts/Core/Attribute/ManagerOrderAttribute.cs* Assets/Scripts/Share/SingletonInstance.cs* Assets/Scenes/Color_Brick.unity
-git commit -m "vcontainer: remove Bootstrap.cs and dead singleton machinery"
+git add Assets/Scripts/Core/Sound/SoundEmitter.cs Assets/Scripts/GameLifetimeScope.cs
+git commit -m "Convert SoundEmitter to VContainer injection"
 ```
 
 ---
 
-### Task 12: Full manual verification
+### Task 10: Final cleanup — strip singleton bases, delete dead code, full regression pass
 
-**Files:** none — this task is a Play-mode pass, no code changes expected.
+This is the only task that removes any manager's `SingletonInstance<T>`/`ReferenceManager<T>` inheritance — safe now because Tasks 1-9 converted every consumer in the codebase.
 
-- [ ] **Step 1: Open `Color_Brick.unity` fresh (not already in Play mode) and enter Play mode**
+**Files:**
+- Modify: `Assets/Scripts/Core/Core_Resource/AddressableManager.cs` (already `MonoBehaviour` since Task 2 — just confirmed here)
+- Modify: `Assets/Scripts/Core/PrefabManager.cs`
+- Modify: `Assets/Scripts/Core/SoundManager.cs`
+- Modify: `Assets/Scripts/Core/TextDataManager.cs`
+- Modify: `Assets/Scripts/Core/InputManager.cs`
+- Modify: `Assets/Scripts/Core/FirebaseManager.cs`
+- Modify: `Assets/Scripts/Core/AdmobManager.cs`
+- Modify: `Assets/Scripts/Core/GameManager.cs`
+- Modify: `Assets/Scripts/Core/ReferenceManager.cs`
+- Delete (once nothing extends it): `Assets/Scripts/Share/SingletonInstance.cs`
+- Delete (once nothing implements/uses it): `Assets/Scripts/Core/Interface/IManager.cs`, `Assets/Scripts/Core/Attribute/ManagerOrderAttribute.cs`
 
-Confirm the Console shows no errors/exceptions during boot (Addressables init, all manager `Awake`/`[Inject]` firing, lobby UI appearing).
+**Interfaces:** None — this task only removes dead inheritance and files; no consumer's public API changes.
 
-- [ ] **Step 2: Walk the full golden path**
+- [ ] **Step 1: Grep-confirm zero remaining `.Instance` references to project-owned managers**
 
-Lobby → start a Classic round → play a few moves (touch/drag input, brick matching, combo, score) → trigger game over (clear the board or let it fill) → game over screen (score/combo display, high score confetti + interstitial ad path if applicable) → retry → home → exit round → app pause (background the app or use `OnApplicationPause` in Editor via `Simulate` if available) → quit.
+```bash
+grep -rn "AddressableManager.Instance\|PrefabManager.Instance\|SoundManager.Instance\|TextDataManager.Instance\|InputManager.Instance\|FirebaseManager.Instance\|AdmobManager.Instance\|GameManager.Instance" Assets/Scripts
+```
 
-- [ ] **Step 3: If anything regressed, use `git bisect` across this branch's commits (Tasks 1–11) to isolate which task introduced it, then fix forward with a new commit — do not amend earlier commits.**
+Expected: no output. If anything remains, go convert that file first using the same `[Inject] Construct(...)` pattern from the earlier tasks before proceeding.
 
-- [ ] **Step 4: Push the branch (only if the user asks) or hand off for PR review**
+- [ ] **Step 2: Strip `SingletonInstance<T>` / `ReferenceManager<T>` inheritance from each manager**
 
-No commit in this task unless a regression fix was made.
+```csharp
+// PrefabManager.cs — Before
+public class PrefabManager : ReferenceManager<PrefabManager>, IManager
+// After
+public class PrefabManager : MonoBehaviour, IManager
+```
+
+Since `PrefabManager` no longer extends `ReferenceManager<T>`, move the members it actually uses (`_assetMap`, `_addressableManager`, `_resolver`, `AssetReferenceMapping`, `PreloadAssets`, `LoadAsset`, `InstantiateObject`, the `Construct` injection method) directly into `PrefabManager` and `SoundManager` — `ReferenceManager<T>` becomes dead once both its only two subclasses stop extending it. After moving the members in, delete `Assets/Scripts/Core/ReferenceManager.cs`.
+
+```csharp
+// SoundManager.cs — Before
+public class SoundManager : ReferenceManager<SoundManager>, IManager
+// After
+public class SoundManager : MonoBehaviour, IManager
+```
+
+(Same treatment — pull in the `AssetReferenceMapping`/`PreloadAssets`/`LoadAsset` members it uses from the old base, keep the injection fields it already has from Tasks 2/3/5.)
+
+```csharp
+// TextDataManager.cs
+public class TextDataManager : MonoBehaviour, IManager   // was SingletonInstance<TextDataManager>
+
+// InputManager.cs
+public class InputManager : MonoBehaviour, IManager      // was SingletonInstance<InputManager>
+
+// FirebaseManager.cs
+public class FirebaseManager : MonoBehaviour, IManager   // was SingletonInstance<FirebaseManager>
+
+// AdmobManager.cs
+public class AdmobManager : MonoBehaviour, IManager       // was SingletonInstance<AdmobManager>
+
+// GameManager.cs
+public class GameManager : MonoBehaviour, IManager, IAsyncStartable, IDisposable   // was SingletonInstance<GameManager>
+```
+
+For each, remove the `Init()` override if its body is empty or only calls `base.Init()`; move any real initialization logic into `Awake()` instead, since there's no more `SingletonInstance.Awake() → Init()` chain driving it. Example for `InputManager`:
+
+```csharp
+// Before
+public override void Init()
+{
+    base.Init();
+    _inputHandler = new PlayerInput();
+    UseInputHandler = true;
+}
+
+// After
+private void Awake()
+{
+    _inputHandler = new PlayerInput();
+    UseInputHandler = true;
+}
+```
+
+Do the same for `AdmobManager` (move its `Init()` body — `Logging("Admob 초기화")` + `RequestConsent()` — into `Awake()`) and `FirebaseManager` (move whatever its `Init()` override does into `Awake()`).
+
+- [ ] **Step 3: Grep-confirm zero remaining references to `IManager`/`ManagerOrder`/`SingletonInstance`, then delete the dead files**
+
+```bash
+grep -rn "IManager\|ManagerOrder\|SingletonInstance" Assets/Scripts
+```
+
+Expected: no output (every manager's declaration was cleaned up in Step 2 — drop `: IManager` and `[ManagerOrder(N)]` from each as part of that same edit if you haven't already). Then:
+
+```bash
+git rm Assets/Scripts/Share/SingletonInstance.cs Assets/Scripts/Share/SingletonInstance.cs.meta
+git rm Assets/Scripts/Core/Interface/IManager.cs Assets/Scripts/Core/Interface/IManager.cs.meta
+git rm Assets/Scripts/Core/Attribute/ManagerOrderAttribute.cs Assets/Scripts/Core/Attribute/ManagerOrderAttribute.cs.meta
+```
+
+- [ ] **Step 4: Full regression playtest**
+
+Play `Color_Brick.unity` end to end:
+1. Boot sequence — no console errors, loading screen closes.
+2. Lobby — leaderboard button, legal popup, resolution change on window resize.
+3. Start a round — bricks spawn, touch/drag slides the board, slide/match SFX play, score and combo update.
+4. Menu during a round — symbol toggle, inquiry flow (send + popup), sound settings toggles, exit-to-home.
+5. Let a round end naturally (board fills) — game over screen shows correct score/combo.
+6. Retry and home buttons on game over screen.
+7. Trigger the exit popup (`Game_Exit` input) and confirm quit flow.
+8. Pause the app (or simulate via Editor) and quit — confirm no exceptions from `GameManager.Dispose()` / `OnApplicationPause` / `OnApplicationQuit`.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add -A
+git commit -m "Remove singleton base classes now that VContainer migration is complete"
+```
