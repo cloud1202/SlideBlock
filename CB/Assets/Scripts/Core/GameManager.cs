@@ -4,7 +4,7 @@ using UnityEngine;
 using UnityEngine.InputSystem;
 using VContainer.Unity;
 
-public class GameManager : IAsyncStartable, System.IDisposable
+public class GameManager : SingletonInstance<GameManager>, IManager
 {
     public int HighScore
     {
