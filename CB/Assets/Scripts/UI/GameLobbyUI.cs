@@ -1,6 +1,7 @@
 using Cysharp.Threading.Tasks;
 using TMPro;
 using UnityEngine;
+using VContainer;
 
 public class GameLobbyUI : BaseUI
 {
@@ -12,18 +13,31 @@ public class GameLobbyUI : BaseUI
     private float _initBtnGroupRatio;
 
     private IBaseUI _legalUI;
+
+    private GameManager m_gameManager;
+    private PrefabManager m_prefabManager;
+    private SoundManager m_soundManager;
+
+    [Inject]
+    public void Construct(GameManager gameManager, PrefabManager prefabManager, SoundManager soundManager)
+    {
+        m_gameManager = gameManager;
+        m_prefabManager = prefabManager;
+        m_soundManager = soundManager;
+    }
+
     public override void Init()
     {
         _version.text = Application.version;
 
-        SoundManager.Instance.PlayBGM(SoundData.Lobby).Forget();
+        m_soundManager.PlayBGM(SoundData.Lobby).Forget();
         InitLoadUI().Forget();
     }
 
     async private UniTask InitLoadUI()
     {
         if (_legalUI == null)
-            _legalUI = await PrefabManager.Instance.InstantiateDynamicUI<IBaseUI>(PrefabData.LegalUI);
+            _legalUI = await m_prefabManager.InstantiateDynamicUI<IBaseUI>(PrefabData.LegalUI);
 
         base.Init();
     }
@@ -58,7 +72,7 @@ public class GameLobbyUI : BaseUI
 
     private void ChangeResolution(float width, float height, float scaleFactor)
     {
-        var canvasHeight = PrefabManager.Instance.MainCanvas.rect.height;
+        var canvasHeight = m_prefabManager.MainCanvas.rect.height;
         _logo.anchoredPosition = new Vector2(0, canvasHeight * _initLogoRatio);
         _btnGroup.anchoredPosition = new Vector2(0, canvasHeight * _initBtnGroupRatio);
     }

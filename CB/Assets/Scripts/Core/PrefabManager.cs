@@ -1,9 +1,7 @@
 using Cysharp.Threading.Tasks;
 using UnityEngine;
 
-
-[ManagerOrder(4)]
-public class PrefabManager : ReferenceManager<PrefabManager>, IManager
+public class PrefabManager : ReferenceManager<PrefabManager>
 {
     private ISafeAreaFitter _staticCanvas;
     private ISafeAreaFitter _dynamicCanvas;
@@ -11,13 +9,16 @@ public class PrefabManager : ReferenceManager<PrefabManager>, IManager
     public RectTransform MainCanvas => _staticCanvas.MyRT;
     public Camera MainCamera => _mainCamera;
 
-    public override void Init()
+    async protected override UniTask Init()
     {
-        base.Init();
+        await base.Init();
+        await LoadAssetReference();
+        CompleteInit(ManagerType.Prefab);
     }
+
     async public override UniTask LoadAssetReference()
     {
-        var assets = await AddressableManager.Instance.LoadResourceData<PrefabAssetReference>(nameof(PrefabAssetReference));
+        var assets = await m_addressableManager.LoadResourceData<PrefabAssetReference>(nameof(PrefabAssetReference));
         _assetDatas = assets.assetDatas;
         await base.LoadAssetReference();
     }
@@ -25,8 +26,8 @@ public class PrefabManager : ReferenceManager<PrefabManager>, IManager
     async public UniTask InitLoadObjects()
     {
         //_mainCamera = await InstantiateObject<Camera>(PrefabData.MainCamera, GameManager.Instance.transform, true);
-        _staticCanvas = await InstantiateObject<ISafeAreaFitter>(PrefabData.StaticCanvas, this.transform, true);
-        _dynamicCanvas = await InstantiateObject<ISafeAreaFitter>(PrefabData.DynamicCanvas, this.transform, true);
+        _staticCanvas = await InstantiateObject<ISafeAreaFitter>(PrefabData.StaticCanvas, null, true);
+        _dynamicCanvas = await InstantiateObject<ISafeAreaFitter>(PrefabData.DynamicCanvas, null, true);
         _staticCanvas.InitSafeArea();
         _dynamicCanvas.InitSafeArea();
         _staticCanvas.MyCanvas.worldCamera = _mainCamera;
@@ -82,6 +83,6 @@ public class PrefabManager : ReferenceManager<PrefabManager>, IManager
             return obj.instance.GetComponent<TI>();
         }
 
-        return await AddressableManager.Instance.Instantiate<TI>(obj, parent, isProtected);
+        return await m_addressableManager.Instantiate<TI>(obj, parent, isProtected);
     }
 }

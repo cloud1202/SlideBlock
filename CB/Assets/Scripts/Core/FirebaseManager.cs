@@ -15,6 +15,7 @@ using System;
 using System.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.SocialPlatforms;
+using VContainer;
 
 [ManagerOrder(1)]
 public class FirebaseManager : SingletonInstance<FirebaseManager>, IManager
@@ -536,6 +537,12 @@ public class FirebaseManager : SingletonInstance<FirebaseManager>, IManager
     private const string MIN_VERSION_KEY = "min_required_version";
     private static string PLAY_STORE_URL => $"https://play.google.com/store/apps/details?id={Application.identifier}";
 
+    private PrefabManager m_prefabManager;
+    [Inject]
+    public void Construct(PrefabManager prefabManager)
+    {
+        m_prefabManager = prefabManager;
+    }
     public async UniTask CheckForForceUpdateAsync()
     {
 #if UNITY_ANDROID || UNITY_EDITOR
@@ -573,7 +580,7 @@ public class FirebaseManager : SingletonInstance<FirebaseManager>, IManager
     {
         await UniTask.Yield();
 
-        var popup = await PrefabManager.Instance.InstantiateDynamicUI<IPopupQuestion>(PrefabData.PopupQuestionUI);
+        var popup = await m_prefabManager.InstantiateDynamicUI<IPopupQuestion>(PrefabData.PopupQuestionUI);
         popup.SetNoticeContent(GameTextData.POPUP_UPDATE_REQUIRED);
         popup.RegistQuestionAction(
             onClickYesAction: () =>

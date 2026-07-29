@@ -1,9 +1,12 @@
 using Cysharp.Threading.Tasks;
 using System;
 using UnityEngine;
+using VContainer;
 
 public class RoundManager : MonoBehaviour, IRound
 {
+    private GameManager m_gameManager;
+    private PrefabManager m_prefabManager;
     public int CurrentScore => _scoreValue;
     public event Action OnUpdateSymbolState;
     private const float COMBO_DELAY = 5f;
@@ -16,6 +19,12 @@ public class RoundManager : MonoBehaviour, IRound
     private int _maxCombo = 0;
     private TimerModule _timer;
 
+    [Inject]
+    public void Construct(GameManager gameManager, PrefabManager prefabManager)
+    {
+        m_gameManager = gameManager;
+        m_prefabManager = prefabManager;
+    }
     async public UniTask Init()
     {
         await LoadRoundObjects();
@@ -23,9 +32,9 @@ public class RoundManager : MonoBehaviour, IRound
 
     async private UniTask LoadRoundObjects()
     {
-        _ingameUI = await PrefabManager.Instance.InstantiateStaticUI<IScore>(PrefabData.InGameUI);
-        _gameOver = await PrefabManager.Instance.InstantiateDynamicUI<IScore>(PrefabData.GameOverUI);
-        _board = await PrefabManager.Instance.InstantiateObject<RoundObject>(PrefabData.Board, this.transform);
+        _ingameUI = await m_prefabManager.InstantiateStaticUI<IScore>(PrefabData.InGameUI);
+        _gameOver = await m_prefabManager.InstantiateDynamicUI<IScore>(PrefabData.GameOverUI);
+        _board = await m_prefabManager.InstantiateObject<RoundObject>(PrefabData.Board, this.transform);
         _board.SetRoundManager(this);
 
         _timer = Timer.CreateTimer(COMBO_DELAY, ResetCombo);
@@ -38,7 +47,7 @@ public class RoundManager : MonoBehaviour, IRound
 
     public void EnterRound()
     {
-        GameManager.Instance.catureEnterTime = Time.realtimeSinceStartup;
+        m_gameManager.catureEnterTime = Time.realtimeSinceStartup;
         FirebaseManager.Instance.LogModeStart("Classic");
         gameObject.SetActive(true);
         _scoreValue = 0;
@@ -61,7 +70,7 @@ public class RoundManager : MonoBehaviour, IRound
 
     public void ExitRound()
     {
-        FirebaseManager.Instance.LogModeQuit("Classic", Time.realtimeSinceStartup - GameManager.Instance.catureEnterTime, _scoreValue);
+        FirebaseManager.Instance.LogModeQuit("Classic", Time.realtimeSinceStartup - m_gameManager.catureEnterTime, _scoreValue);
         _ingameUI.Close();
         _gameOver.Close();
         Destroy(gameObject);
@@ -81,7 +90,7 @@ public class RoundManager : MonoBehaviour, IRound
         if (isCombo == false)
             return;
 
-        Utility.AsyncDurationVibrateObject(PrefabManager.Instance.MainCamera.transform, new System.Threading.CancellationTokenSource()).Forget();
+        Utility.AsyncDurationVibrateObject(m_prefabManager.MainCamera.transform, new System.Threading.CancellationTokenSource()).Forget();
         _comboValue++;
         _ingameUI.UpdateCombo(_comboValue, boundCenter);
         _timer.Start();

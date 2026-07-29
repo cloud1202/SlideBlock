@@ -2,32 +2,44 @@ using Cysharp.Threading.Tasks;
 using System.Threading;
 using UnityEngine;
 using UnityEngine.InputSystem;
+using VContainer;
 using VContainer.Unity;
 
-public class GameManager : SingletonInstance<GameManager>, IManager
+public class GameManager : BaseManager
 {
+    private FirebaseManager m_firebaseManager;
+    private InputManager m_inputManger;
+    private PrefabManager m_prefabManager;
+    [Inject]
+    public void Construct(FirebaseManager firebaseManager, InputManager inputManger, PrefabManager prefabManager)
+    {
+        m_firebaseManager = firebaseManager;
+        m_inputManger = inputManger;
+        m_prefabManager = prefabManager;
+    }
+
     public int HighScore
     {
-        get => FirebaseManager.Instance.ClassicScore;
+        get => m_firebaseManager.ClassicScore;
 
         set
         {
-            if (FirebaseManager.Instance.ClassicScore == value)
+            if (m_firebaseManager.ClassicScore == value)
                 return;
 
-            FirebaseManager.Instance.ClassicScore = value;
+            m_firebaseManager.ClassicScore = value;
         }
     }
     public bool IsSymbolOn
     {
-        get => FirebaseManager.Instance.IsSymbolOn;
+        get => m_firebaseManager.IsSymbolOn;
 
         set
         {
-            if (FirebaseManager.Instance.IsSymbolOn == value)
+            if (m_firebaseManager.IsSymbolOn == value)
                 return;
 
-            FirebaseManager.Instance.IsSymbolOn = value;
+            m_firebaseManager.IsSymbolOn = value;
             _roundManager?.ChangeSymbolState();
         }
     }
@@ -42,26 +54,34 @@ public class GameManager : SingletonInstance<GameManager>, IManager
     async public UniTask Bootstrap()
     {
         ResolutionScreen.InitResolution();
-        InputManager.Instance.SubscribeToInputHandler(InputType.Game_Exit, OnClickExit);
-        await UniTask.WaitUntil(() => FirebaseManager.Instance.IsInitialized);
-        FirebaseManager.Instance.Log("AddressableManager Init");
-        await AddressableManager.Instance.SetAddressable();
-        FirebaseManager.Instance.Log("PrefabManager Init");
-        await PrefabManager.Instance.LoadAssetReference();
-        FirebaseManager.Instance.Log("SoundManager Init");
-        await SoundManager.Instance.LoadAssetReference();
-        FirebaseManager.Instance.Log("TextDataManager Init");
-        await TextDataManager.Instance.LoadAssetReference();
-        FirebaseManager.Instance.Log("PrefabManager Load");
-        await PrefabManager.Instance.InitLoadObjects();
-        FirebaseManager.Instance.Log("Force Update Check");
-        await FirebaseManager.Instance.CheckForForceUpdateAsync();
-        await UniTask.WaitUntil(() => FirebaseManager.Instance?.IsUpdate ?? false);
-        _lobbyUI = await PrefabManager.Instance.InstantiateStaticUI<IBaseUI>(PrefabData.LobbyUI);
-        _loadingUI = await PrefabManager.Instance.InstantiateStaticUI<IBaseUI>(PrefabData.LoadingUI);
+        m_inputManger.SubscribeToInputHandler(InputType.Game_Exit, OnClickExit);
+        //await UniTask.WaitUntil(() => m_firebaseManager.IsInitialized);
+        //m_firebaseManager.Log("AddressableManager Init");
+        //await AddressableManager.Instance.SetAddressable();
+        //m_firebaseManager.Log("PrefabManager Init");
+        //await PrefabManager.Instance.LoadAssetReference();
+        //m_firebaseManager.Log("SoundManager Init");
+        //await SoundManager.Instance.LoadAssetReference();
+        //m_firebaseManager.Log("TextDataManager Init");
+        //await TextDataManager.Instance.LoadAssetReference();
+        //m_firebaseManager.Log("PrefabManager Load");
+        //await PrefabManager.Instance.InitLoadObjects();
+        //m_firebaseManager.Log("Force Update Check");
+        //await m_firebaseManager.CheckForForceUpdateAsync();
+        await UniTask.WaitUntil(() => m_firebaseManager?.IsUpdate ?? false);
+        await CheckedManagers(
+            ManagerType.Addressable,
+            ManagerType.Prefab,
+            ManagerType.Sound,
+            ManagerType.TextData,
+            ManagerType.Firebase);
+
+        CompleteInit(ManagerType.Game);
+        _lobbyUI = await m_prefabManager.InstantiateStaticUI<IBaseUI>(PrefabData.LobbyUI);
+        _loadingUI = await m_prefabManager.InstantiateStaticUI<IBaseUI>(PrefabData.LoadingUI);
         _lobbyUI.Init();
         _loadingUI.Init();
-        await UniTask.WaitUntil(() => FirebaseManager.Instance.IsLoadData);
+        await UniTask.WaitUntil(() => m_firebaseManager.IsLoadData);
         await UniTask.WaitForSeconds(2f);
         _loadingUI.Close();
     }
@@ -70,7 +90,7 @@ public class GameManager : SingletonInstance<GameManager>, IManager
     {
         if (_roundManager == null)
         {
-            _roundManager = await PrefabManager.Instance.InstantiateObject<IRound>(PrefabData.RoundManager);
+            _roundManager = await m_prefabManager.InstantiateObject<IRound>(PrefabData.RoundManager);
             await _roundManager.Init();
         }
         _lobbyUI.Close();
@@ -95,9 +115,9 @@ public class GameManager : SingletonInstance<GameManager>, IManager
     async private UniTask ShowExitToast()
     {
 #if UNITY_ANDROID || UNITY_EDITOR
-        if (PrefabManager.Instance.TryGetInstance<IPopupQuestion>(PrefabData.PopupQuestionUI, out IPopupQuestion popup))
+        if (m_prefabManager.TryGetInstance<IPopupQuestion>(PrefabData.PopupQuestionUI, out IPopupQuestion popup))
             return;
-        popup = await PrefabManager.Instance.InstantiateDynamicUI<IPopupQuestion>(PrefabData.PopupQuestionUI);
+        popup = await m_prefabManager.InstantiateDynamicUI<IPopupQuestion>(PrefabData.PopupQuestionUI);
 
         popup.SetNoticeContent(GameTextData.POPUP_EXIT_GAME);
         popup.RegistQuestionAction(QuitGame);
@@ -119,15 +139,15 @@ public class GameManager : SingletonInstance<GameManager>, IManager
         PlayerPrefs.Save();
 
         if (_roundManager != null)
-            FirebaseManager.Instance.LogModePause("Classic", Time.realtimeSinceStartup - catureEnterTime, _roundManager.CurrentScore);
+            m_firebaseManager.LogModePause("Classic", Time.realtimeSinceStartup - catureEnterTime, _roundManager.CurrentScore);
 
-        FirebaseManager.Instance.Log("App paused");
+        m_firebaseManager.Log("App paused");
     }
 
     private void OnApplicationQuit()
     {
         PlayerPrefs.Save();
-        FirebaseManager.Instance.LogEvent("app_quit","real_time", Time.realtimeSinceStartup.ToString());
+        m_firebaseManager.LogEvent("app_quit","real_time", Time.realtimeSinceStartup.ToString());
     }
 
     public void Dispose()

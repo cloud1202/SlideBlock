@@ -1,13 +1,17 @@
 using TMPro;
 using UnityEngine;
+using VContainer;
 
 public class TextHandler : MonoBehaviour
 {
     [SerializeField] private GameTextData _textData;
     [SerializeField] private TextMeshProUGUI _handler;
 
-    private void Awake()
+    protected TextDataManager m_textDataManager;
+    [Inject]
+    public void Construct(TextDataManager textDataManager)
     {
-        _handler.text = TextDataManager.Instance.GetGameText(_textData);
+        m_textDataManager = textDataManager;
+        _handler.text = m_textDataManager.GetGameText(_textData);
     }
 }

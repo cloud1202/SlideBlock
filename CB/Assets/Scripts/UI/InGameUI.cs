@@ -1,6 +1,7 @@
 using Cysharp.Threading.Tasks;
 using TMPro;
 using UnityEngine;
+using VContainer;
 
 public class InGameUI : BaseUI, IScore
 {
@@ -9,19 +10,30 @@ public class InGameUI : BaseUI, IScore
     private IBaseUI _menuUI;
     private IScore _scoreUI;
 
+    private GameManager m_gameManager;
+    private PrefabManager m_prefabManager;
+    private SoundManager m_soundManager;
+
+    [Inject]
+    public void Construct(GameManager gameManager, PrefabManager prefabManager, SoundManager soundManager)
+    {
+        m_gameManager = gameManager;
+        m_prefabManager = prefabManager;
+        m_soundManager = soundManager;
+    }
     public override void Init()
     {
-        SoundManager.Instance.PlayBGM(SoundData.Ingame).Forget();
+       m_soundManager.PlayBGM(SoundData.Ingame).Forget();
         InitLoadUI().Forget();
     }
 
     async private UniTask InitLoadUI()
     {
         if (_scoreUI == null)
-            _scoreUI = await PrefabManager.Instance.InstantiateDynamicUI<IScore>(PrefabData.IngameScoreUI);
+            _scoreUI = await m_prefabManager.InstantiateDynamicUI<IScore>(PrefabData.IngameScoreUI);
 
         if (_menuUI == null)
-            _menuUI = await PrefabManager.Instance.InstantiateDynamicUI<IBaseUI>(PrefabData.MenuUI);
+            _menuUI = await m_prefabManager.InstantiateDynamicUI<IBaseUI>(PrefabData.MenuUI);
 
         _scoreUI.Init();
         SetScores();

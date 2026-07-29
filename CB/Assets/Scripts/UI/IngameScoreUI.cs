@@ -2,6 +2,7 @@ using Cysharp.Threading.Tasks;
 using System.Threading;
 using TMPro;
 using UnityEngine;
+using VContainer;
 
 public class IngameScoreUI : BaseUI, IScore
 {
@@ -14,6 +15,17 @@ public class IngameScoreUI : BaseUI, IScore
     private CancellationTokenSource _vibrationToken = null;
     private float _initScoreRatio;
 
+    private GameManager m_gameManager;
+    private PrefabManager m_prefabManager;
+    private SoundManager m_soundManager;
+
+    [Inject]
+    public void Construct(GameManager gameManager, PrefabManager prefabManager, SoundManager soundManager)
+    {
+        m_gameManager = gameManager;
+        m_prefabManager = prefabManager;
+        m_soundManager = soundManager;
+    }
     public override void Init()
     {
         _scoreObj.Init();
@@ -91,7 +103,7 @@ public class IngameScoreUI : BaseUI, IScore
             _scoreBox.anchoredPosition = new Vector2(0, -180f);
             return;
         }
-        var canvasHeight = PrefabManager.Instance.MainCanvas.rect.height;
+        var canvasHeight = m_prefabManager.MainCanvas.rect.height;
         _scoreBox.anchoredPosition = new Vector2(0, canvasHeight * _initScoreRatio);
     }
 }

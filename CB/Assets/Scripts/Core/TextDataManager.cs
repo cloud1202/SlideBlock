@@ -1,22 +1,28 @@
 using Cysharp.Threading.Tasks;
 using System.Collections.Generic;
 using UnityEngine;
+using VContainer;
 using static GameTextSO;
 
-[ManagerOrder(5)]
-public class TextDataManager : SingletonInstance<TextDataManager>, IManager
+public class TextDataManager : BaseManager
 {
     private GameTextSO _gameText;
 
     protected Dictionary<int, GameText> _gameTextMap = new Dictionary<int, GameText>();
-    public override void Init()
+
+    private AddressableManager m_addressableManager;
+    [Inject]
+    public void Construct(AddressableManager addressableManager)
     {
-        base.Init();
+        m_addressableManager = addressableManager;
+        LoadAssetReference().Forget();
+        CompleteInit(ManagerType.TextData);
     }
+
 
     async public virtual UniTask LoadAssetReference()
     {
-        _gameText = await AddressableManager.Instance.LoadResourceData<GameTextSO>(nameof(GameTextSO));
+        _gameText = await m_addressableManager.LoadResourceData<GameTextSO>(nameof(GameTextSO));
         AssetReferenceMapping();
     }
 

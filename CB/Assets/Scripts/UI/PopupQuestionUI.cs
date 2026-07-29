@@ -2,6 +2,7 @@ using System;
 using TMPro;
 using UnityEngine;
 using UnityEngine.InputSystem;
+using VContainer;
 
 public class PopupQuestionUI : BaseUI, IPopupQuestion
 {
@@ -13,6 +14,12 @@ public class PopupQuestionUI : BaseUI, IPopupQuestion
     private Action _onClickYes;
     private Action _onClickNo;
 
+    protected TextDataManager m_textDataManager;
+    [Inject]
+    public void Construct(TextDataManager textDataManager)
+    {
+        m_textDataManager = textDataManager;
+    }
     public override void Init()
     {
         InputManager.Instance.SubscribeToInputHandler(InputType.Game_Exit, OnClickBackKey);
@@ -28,7 +35,7 @@ public class PopupQuestionUI : BaseUI, IPopupQuestion
 
     public void SetNoticeContent(GameTextData content)
     {
-        _content.text = TextDataManager.Instance.GetGameText(content);
+        _content.text = m_textDataManager.GetGameText(content);
         _panel.sizeDelta = Utility.UpdateLayoutSize(_content, _minSize, _maxSize, _padding);
     }
 

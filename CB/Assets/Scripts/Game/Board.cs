@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using UnityEngine;
+using VContainer;
 using static UnityEngine.InputSystem.InputAction;
 
 
@@ -39,6 +40,17 @@ public class Board : RoundObject
     }
     private BoardDirection _boardDirection = BoardDirection.None;
 
+    private GameManager m_gameManager;
+    private PrefabManager m_prefabManager;
+    private SoundManager m_soundManager;
+
+    [Inject]
+    public void Construct(GameManager gameManager, PrefabManager prefabManager, SoundManager soundManager)
+    {
+        m_gameManager = gameManager;
+        m_prefabManager = prefabManager;
+        m_soundManager = soundManager;
+    }
     private void Awake()
     {
         InputManager.Instance.SubscribeToInputHandler(InputType.Player_Touch, OnTouchPoint, cancel: OnEndTouchPoint);
@@ -89,7 +101,7 @@ public class Board : RoundObject
         int initCnt = (BOARD_SIZE * BOARD_SIZE) - _bricks.Count;
         for (int i = 0; i < initCnt; i++)
         {
-            var brick = await PrefabManager.Instance.InstantiateObject<Brick>(PrefabData.Brick, this.transform);
+            var brick = await m_prefabManager.InstantiateObject<Brick>(PrefabData.Brick, this.transform);
             brick.gameObject.SetActive(false);
             _roundManager.OnUpdateSymbolState += brick.SetSymbolState;
             _bricks.Enqueue(brick);
@@ -239,7 +251,7 @@ public class Board : RoundObject
     async private UniTask SlideBrick()
     {
         bool anyDestroyed = false;
-        await SoundManager.Instance.PlaySFX(SoundData.Slide);
+        await m_soundManager.PlaySFX(SoundData.Slide);
 
         do
         {
@@ -261,7 +273,7 @@ public class Board : RoundObject
         // 사운드 재생
         if (destoryMatchGroupCnt > 0)
         {
-            await SoundManager.Instance.PlaySFX(SoundData.Match);
+            await m_soundManager.PlaySFX(SoundData.Match);
             await UniTask.WaitForSeconds(0.4f, cancellationToken: _changeDirectionToken.Token);
             return true;
         }

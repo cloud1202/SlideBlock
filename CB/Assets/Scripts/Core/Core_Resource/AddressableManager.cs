@@ -5,20 +5,20 @@ using UnityEngine;
 using UnityEngine.AddressableAssets;
 using UnityEngine.ResourceManagement.AsyncOperations;
 
-public class AddressableManager : SingletonInstance<AddressableManager>
+public class AddressableManager : BaseManager
 {
     private Dictionary<ContainLabel, List<AsyncOperationHandle>> _loadHandles = new Dictionary<ContainLabel, List<AsyncOperationHandle>>();
     private List<GameObject> _instantiateHandles = new List<GameObject>();
 
-    public override void Init()
+    public AddressableManager()
     {
-        base.Init();
+        SetAddressable().Forget();
     }
-
     public async UniTask SetAddressable()
     {
         await Addressables.InitializeAsync();
         await LoadRemoteAddressable();
+        CompleteInit(ManagerType.Addressable);
     }
 
     private async UniTask LoadRemoteAddressable()

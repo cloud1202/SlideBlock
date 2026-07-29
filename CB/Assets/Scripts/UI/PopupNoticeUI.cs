@@ -1,6 +1,7 @@
 using Cysharp.Threading.Tasks;
 using TMPro;
 using UnityEngine;
+using VContainer;
 
 public class PopupNoticeUI : BaseUI, IPopupNotice
 {
@@ -10,9 +11,16 @@ public class PopupNoticeUI : BaseUI, IPopupNotice
     [SerializeField] private Vector2 _maxSize;
     [SerializeField] private Vector2 _padding;
 
+    protected TextDataManager m_textDataManager;
+    [Inject]
+    public void Construct(TextDataManager textDataManager)
+    {
+        m_textDataManager = textDataManager;
+    }
+
     public void SetNoticeContent(GameTextData content)
     {
-        _content.text = TextDataManager.Instance.GetGameText(content);
+        _content.text = m_textDataManager.GetGameText(content);
         _panel.sizeDelta = Utility.UpdateLayoutSize(_content, _minSize, _maxSize, _padding);
     }
 }

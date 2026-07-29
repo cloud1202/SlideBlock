@@ -2,15 +2,22 @@ using Cysharp.Threading.Tasks;
 using System.Collections.Generic;
 using System.Threading;
 using UnityEngine;
+using VContainer;
 
-public class ReferenceManager<T> : SingletonInstance<T>
-    where T : MonoBehaviour
+public class ReferenceManager<T> : BaseManager
 {
     protected Dictionary<int, IAssetResource> _assetMap = new Dictionary<int, IAssetResource>();
     protected IEnumerable<IAssetResource> _assetDatas = new List<IAssetResource>();
-    public override void Init()
+
+    protected AddressableManager m_addressableManager;
+    [Inject]
+    public void Construct(AddressableManager addressablemanager)
     {
-        base.Init();
+        m_addressableManager = addressablemanager;
+    }
+
+    async protected virtual UniTask Init()
+    {
     }
 
     async public virtual UniTask LoadAssetReference()
@@ -41,7 +48,7 @@ public class ReferenceManager<T> : SingletonInstance<T>
                 assets.Add(obj);
             }
         }
-        await AddressableManager.Instance.PreloadAssets(label, assets.ToArray());
+        await m_addressableManager.PreloadAssets(label, assets.ToArray());
     }
 
     public async UniTask<TI> LoadAsset<TI>(int index, CancellationToken ct = new CancellationToken()) where TI : UnityEngine.Object
@@ -51,7 +58,7 @@ public class ReferenceManager<T> : SingletonInstance<T>
             return default;
         }
 
-        return await AddressableManager.Instance.Load<TI>(obj, ct);
+        return await m_addressableManager.Load<TI>(obj, ct);
     }
     protected async UniTask<TI> InstantiateObject<TI>(int index, Transform parent = null, bool isProtected = false)
     {
@@ -60,9 +67,6 @@ public class ReferenceManager<T> : SingletonInstance<T>
             return default;
         }
 
-        if (parent == null)
-            parent = this.transform;
-
-        return await AddressableManager.Instance.Instantiate<TI>(obj, parent, isProtected);
+        return await m_addressableManager.Instantiate<TI>(obj, parent, isProtected);
     }
 }

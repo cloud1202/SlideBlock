@@ -5,14 +5,13 @@ public class GameLifetimeScope : LifetimeScope
 {
     protected override void Configure(IContainerBuilder builder)
     {
-        builder.RegisterComponentOnNewGameObject<AddressableManager>(Lifetime.Singleton, nameof(AddressableManager));
-        builder.RegisterComponentOnNewGameObject<PrefabManager>(Lifetime.Singleton, nameof(PrefabManager));
-        builder.RegisterComponentOnNewGameObject<SoundManager>(Lifetime.Singleton, nameof(SoundManager));
-        builder.RegisterComponentOnNewGameObject<TextDataManager>(Lifetime.Singleton, nameof(TextDataManager));
-        builder.RegisterComponentOnNewGameObject<InputManager>(Lifetime.Singleton, nameof(InputManager));
-        builder.RegisterComponentOnNewGameObject<FirebaseManager>(Lifetime.Singleton, nameof(FirebaseManager));
-        builder.RegisterComponentOnNewGameObject<AdmobManager>(Lifetime.Singleton, nameof(AdmobManager));
-
+        builder.RegisterEntryPoint<AddressableManager>(Lifetime.Singleton).AsSelf();
+        builder.RegisterEntryPoint<FirebaseManager>(Lifetime.Singleton).AsSelf();
+        builder.RegisterEntryPoint<AdmobManager>(Lifetime.Singleton).AsSelf();
+        builder.RegisterEntryPoint<InputManager>(Lifetime.Singleton).AsSelf();
+        builder.RegisterEntryPoint<PrefabManager>(Lifetime.Singleton).AsSelf();
+        builder.RegisterEntryPoint<SoundManager>(Lifetime.Singleton).AsSelf();
+        builder.RegisterEntryPoint<TextDataManager>(Lifetime.Singleton).AsSelf();
         builder.RegisterEntryPoint<GameManager>(Lifetime.Singleton).AsSelf();
     }
 }

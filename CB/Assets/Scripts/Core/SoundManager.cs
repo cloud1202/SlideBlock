@@ -3,9 +3,9 @@ using DG.Tweening;
 using System.Threading;
 using UnityEngine;
 using UnityEngine.Events;
+using VContainer;
 
-[ManagerOrder(6)]
-public class SoundManager : ReferenceManager<SoundManager>, IManager
+public class SoundManager : ReferenceManager<SoundManager>
 {
     private const float DEFAULT_SOUND_VOLUM = 0.5f;
 
@@ -84,17 +84,19 @@ public class SoundManager : ReferenceManager<SoundManager>, IManager
         }
     }
 
-    public override void Init()
+    async protected override UniTask Init()
     {
-        base.Init();
+        await base.Init();
         CreateBGMAudio();
         CreateSFXAudio();
 
-        LoadSaveFieldData().Forget();
+        await LoadSaveFieldData();
+        await LoadAssetReference();
         //_updateSoundVolumEvent += UpdateVolum;
         //_updateBGMVolumEvent += UpdateBGMVolum;
         //_updateSFXVolumEvent += UpdateSFXVolum;
         SoundVolumPer = 0.5f;
+        CompleteInit(ManagerType.Sound);
     }
 
     async private UniTask LoadSaveFieldData()
@@ -106,7 +108,7 @@ public class SoundManager : ReferenceManager<SoundManager>, IManager
 
     async public override UniTask LoadAssetReference()
     {
-        var assets = await AddressableManager.Instance.LoadResourceData<SoundAssetReference>(nameof(SoundAssetReference));
+        var assets = await m_addressableManager.LoadResourceData<SoundAssetReference>(nameof(SoundAssetReference));
         _assetDatas = assets.assetDatas;
         await base.LoadAssetReference();
     }
@@ -118,7 +120,7 @@ public class SoundManager : ReferenceManager<SoundManager>, IManager
         _bgmAudio.playOnAwake = false;
         _bgmAudio.loop = true;
         _bgmAudio.volume = 1.0f;
-        go.transform.SetParent(this.transform);
+        go.transform.SetParent(null);
     }
 
     private void CreateSFXAudio()
@@ -127,7 +129,7 @@ public class SoundManager : ReferenceManager<SoundManager>, IManager
         _sfxAudio = go.AddComponent<AudioSource>();
         _sfxAudio.playOnAwake = false;
         _sfxAudio.volume = 1.0f;
-        go.transform.SetParent(this.transform);
+        go.transform.SetParent(null);
     }
 
     private void UpdateVolum(float volumPer)

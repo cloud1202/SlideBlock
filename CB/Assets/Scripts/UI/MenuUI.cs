@@ -1,11 +1,23 @@
 using Cysharp.Threading.Tasks;
 using UnityEngine;
+using VContainer;
 
 public class MenuUI : BaseUI
 {
     [SerializeField] private SlideToggle _symbolToggle;
     private IBaseUI _inquriyUI;
 
+    private GameManager m_gameManager;
+    private PrefabManager m_prefabManager;
+    private SoundManager m_soundManager;
+
+    [Inject]
+    public void Construct(GameManager gameManager, PrefabManager prefabManager, SoundManager soundManager)
+    {
+        m_gameManager = gameManager;
+        m_prefabManager = prefabManager;
+        m_soundManager = soundManager;
+    }
     private void Awake()
     {
         //_symbolToggle.SetValueWithoutNotify(GameManager.Instance.IsSymbolOn);
@@ -26,7 +38,7 @@ public class MenuUI : BaseUI
     async private UniTask InitLoadUI()
     {
         if (_inquriyUI == null)
-            _inquriyUI = await PrefabManager.Instance.InstantiateDynamicUI<IBaseUI>(PrefabData.InquriyUI, this.transform);
+            _inquriyUI = await m_prefabManager.InstantiateDynamicUI<IBaseUI>(PrefabData.InquriyUI, this.transform);
 
         base.Init();
     }
