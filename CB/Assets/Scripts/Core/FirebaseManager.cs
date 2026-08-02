@@ -1,7 +1,6 @@
 using Cysharp.Threading.Tasks;
 #if UNITY_ANDROID || UNITY_EDITOR
 using Firebase;
-using Firebase.Analytics;
 using Firebase.Auth;
 using Firebase.Crashlytics;
 using Firebase.Extensions;
@@ -25,9 +24,6 @@ public class FirebaseManager : BaseManager
 #else
     public bool IsUpdate { get; private set; } = true;
 #endif
-    public bool IsLoadData => _user != null;
-    private UserData _user = null;
-
     public string UserId { get; private set; }
 
 #if UNITY_ANDROID || UNITY_EDITOR
@@ -46,70 +42,6 @@ public class FirebaseManager : BaseManager
     /// 닉네임 설정용 캐시. 랭킹 기록 시 같이 올라감. SetNickname()으로 변경 가능.
     /// </summary>
     public string Nickname { get; private set; } = "Player";
-    public int ClassicScore
-    {
-        get
-        {
-            return _user.ClassicScore;
-        }
-        set
-        {
-            PlayerPrefs.SetInt(SaveFieldData.Fields[EnumConverter.Enum32ToInt(SaveFieldType.HighScore_Classic)], value);
-            _user.ClassicScore = value;
-            _user.IsDirty = true;
-            SaveUserData();
-            TryReportLeaderboard().Forget();
-        }
-    }
-    public bool IsBGMOn
-    {
-        get
-        {
-            return _user.IsBGMOn;
-        }
-        set
-        {
-            PlayerPrefs.SetInt(SaveFieldData.Fields[EnumConverter.Enum32ToInt(SaveFieldType.IsBGMOn)], value.GetHashCode());
-            if (!value) LogEvent("bgm_off");
-            _user.IsBGMOn = value;
-            _user.IsDirty = true;
-            SaveUserData();
-        }
-    }
-    public bool IsSFXOn
-    {
-        get
-        {
-            return _user.IsSFXOn;
-        }
-        set
-        {
-            PlayerPrefs.SetInt(SaveFieldData.Fields[EnumConverter.Enum32ToInt(SaveFieldType.IsSFXOn)], value.GetHashCode());
-            if (!value) LogEvent("sfx_off");
-            _user.IsSFXOn = value;
-            _user.IsDirty = true;
-            SaveUserData();
-        }
-    }
-
-    public bool IsSymbolOn
-    {
-        get
-        {
-            return _user.IsSymbolOn;
-        }
-        set
-        {
-            PlayerPrefs.SetInt(SaveFieldData.Fields[EnumConverter.Enum32ToInt(SaveFieldType.IsSymbolOn)], value.GetHashCode());
-
-            if (value) LogEvent("symbol_on");
-            _user.IsSymbolOn = value;
-            _user.IsDirty = true;
-            SaveUserData();
-        }
-    }
-
-
 
     #region Core Initialization
 
@@ -122,19 +54,20 @@ public class FirebaseManager : BaseManager
             if (status != DependencyStatus.Available)
             {
                 Error($"Firebase 의존성 문제: {status}");
+                // IsInitialized는 false로 두되 게이트는 연다.
+                // 대기가 풀리고 Telemetry/Firestore 호출은 전부 no-op으로 빠진다.
+                CompleteInit(ManagerType.Firebase);
                 return;
             }
             _firestore = FirebaseFirestore.DefaultInstance;
             Logging("Firebase 초기화 완료");
 
             InitCrashlytics();
-            //InitMessaging();
             SignInAuth();
             IsInitialized = true;
             CompleteInit(ManagerType.Firebase);
         });
 #else
-        _user = new UserData();
         Logging("WebGL: PlayerPrefs 기반 로컬 데이터로 초기화");
         IsInitialized = true;
         CompleteInit(ManagerType.Firebase);
@@ -157,7 +90,6 @@ public class FirebaseManager : BaseManager
             UserId = auth.CurrentUser.UserId;
             Logging($"[Editor] 기존 세션 재사용: {UserId}");
             Crashlytics.SetUserId(UserId);
-            LoadUserData().Forget();
             return;
         }
 
@@ -168,7 +100,6 @@ public class FirebaseManager : BaseManager
         {
             UserId = savedUid;
             Logging($"[Editor] 저장된 UID 재사용: {UserId}");
-            LoadUserData().Forget();
             return;
         }
 #endif
@@ -197,7 +128,7 @@ public class FirebaseManager : BaseManager
         }
         catch (Exception e)
         {
-            LogError(e);
+            Crashlytics.LogException(e);
             Logging(e.ToString());
             return false;
         }
@@ -258,7 +189,6 @@ public class FirebaseManager : BaseManager
         Crashlytics.SetUserId(UserId);
 
         _authTcs?.TrySetResult(!string.IsNullOrEmpty(Nickname));
-        LoadUserData().Forget();
         Logging($"User signed in successfully: {result.User.DisplayName} ({result.User.UserId})");
     }
 #endif
@@ -270,11 +200,11 @@ public class FirebaseManager : BaseManager
     /// 유저 문서 한 필드만 병합 저장. 예: SaveField("highScore_classic", 15200)
     /// </summary>
 
-    public void SaveUserData()
+    public void SaveUser(UserData user)
     {
 #if UNITY_ANDROID || UNITY_EDITOR
         PlayerPrefs.Save();
-        if (!IsInitialized || string.IsNullOrEmpty(UserId) || !IsLoadData)
+        if (!IsInitialized || string.IsNullOrEmpty(UserId) || user == null)
         {
             Warning("Firestore 저장 실패: 아직 초기화/로그인되지 않음");
             return;
@@ -282,20 +212,45 @@ public class FirebaseManager : BaseManager
         LLogger.Log("Save Firestore");
         var docRef = _firestore.Collection(USERS_COLLECTION).Document(UserId);
 
-        docRef.SetAsync(_user, SetOptions.MergeAll).ContinueWithOnMainThread(task =>
+        docRef.SetAsync(user, SetOptions.MergeAll).ContinueWithOnMainThread(task =>
         {
             if (task.IsFaulted || task.IsCanceled)
                 Error($"Firestore 저장 실패 ({UserId}): {task.Exception}");
 
-            _user.IsDirty = false;
+            user.IsDirty = false;
         });
 #else
         PlayerPrefs.Save();
 #endif
     }
 
+    private const float AUTH_WAIT_SECONDS = 10f;
+
+    /// <summary>
+    /// 유저 문서를 읽어온다. 인증이 끝나지 않았으면 최대 AUTH_WAIT_SECONDS 대기하고,
+    /// 그래도 안 되면 PlayerPrefs 기반 로컬 UserData를 돌려준다. 절대 null을 반환하지 않는다.
+    /// </summary>
+    public async UniTask<UserData> LoadUserAsync()
+    {
 #if UNITY_ANDROID || UNITY_EDITOR
-    async private UniTask LoadUserData()
+        if (IsInitialized)
+        {
+            float deadline = Time.realtimeSinceStartup + AUTH_WAIT_SECONDS;
+            await UniTask.WaitUntil(() =>
+                !string.IsNullOrEmpty(UserId) || Time.realtimeSinceStartup > deadline);
+
+            if (!string.IsNullOrEmpty(UserId))
+                return await FetchUserDocumentAsync();
+
+            Warning("인증 대기 시간 초과. 로컬 데이터로 진행한다.");
+        }
+#endif
+        Logging("로컬 PlayerPrefs 기반 UserData로 진행");
+        return new UserData();
+    }
+
+#if UNITY_ANDROID || UNITY_EDITOR
+    private async UniTask<UserData> FetchUserDocumentAsync()
     {
         Logging("유저 데이터 로드 시작");
         var docRef = _firestore.Collection(USERS_COLLECTION).Document(UserId);
@@ -305,112 +260,24 @@ public class FirebaseManager : BaseManager
 
             if (snapshot.Exists)
             {
-                _user = snapshot.ConvertTo<UserData>();
+                Logging("유저 데이터 로드 완료");
+                return snapshot.ConvertTo<UserData>();
             }
-            else
-            {
-                Logging("신규 유저, 초기 문서 생성");
-                _user = new UserData();
-                _user.CreatedAt = Timestamp.GetCurrentTimestamp();
-                SaveUserData();
-            }
-            Logging("유저 데이터 로드 완료");
-            // 필요 시 여기서 GameManager 등에 로드된 데이터를 전달
-            // 예: int highScore = snapshot.GetValue<int>("highScore_classic");
+
+            Logging("신규 유저, 초기 문서 생성");
+            var created = new UserData();
+            created.CreatedAt = Timestamp.GetCurrentTimestamp();
+            SaveUser(created);
+            return created;
         }
-        catch(Exception e)
+        catch (Exception e)
         {
-            LogError(e);
+            Crashlytics.LogException(e);
             Error(e.ToString());
+            return new UserData();
         }
     }
 #endif
-
-    #endregion
-
-    #region Analytics
-
-#if UNITY_ANDROID || UNITY_EDITOR
-    public void LogEvent(string eventName)
-    {
-        FirebaseAnalytics.LogEvent(eventName);
-    }
-
-    public void LogEvent(string eventName, string paramName, string paramValue)
-    {
-        FirebaseAnalytics.LogEvent(eventName, new Parameter(paramName, paramValue));
-    }
-
-    public void LogEvent(string eventName, params Parameter[] parameters)
-    {
-        FirebaseAnalytics.LogEvent(eventName, parameters);
-    }
-#else
-    public void LogEvent(string eventName)
-    {
-        WebAnalyticsBridge.LogEvent(eventName);
-    }
-
-    public void LogEvent(string eventName, string paramName, string paramValue)
-    {
-        WebAnalyticsBridge.LogEvent(eventName, paramName, paramValue);
-    }
-#endif
-
-    /// <summary>
-    /// 모드 시작 이벤트. 예: LogModeStart("classic")
-    /// </summary>
-    public void LogModeStart(string mode)
-    {
-#if UNITY_ANDROID || UNITY_EDITOR
-        LogEvent("game_start", new Parameter("mode", mode));
-#else
-        WebAnalyticsBridge.LogModeStart(mode);
-#endif
-    }
-
-    /// <summary>
-    /// 중도 이탈 이벤트. 플레이 시간(초)과 모드를 함께 기록.
-    /// </summary>
-    public void LogModeQuit(string mode, float playDurationSec, int currentScore)
-    {
-#if UNITY_ANDROID || UNITY_EDITOR
-        LogEvent("game_quit",
-            new Parameter("mode", mode),
-            new Parameter("play_duration_sec", playDurationSec),
-            new Parameter("score", currentScore));
-#else
-        WebAnalyticsBridge.LogModeQuit(mode, playDurationSec, currentScore);
-#endif
-    }
-
-    public void LogModePause(string mode, float playDurationSec, int currentScore)
-    {
-#if UNITY_ANDROID || UNITY_EDITOR
-        LogEvent("game_pause",
-            new Parameter("mode", mode),
-            new Parameter("play_duration_sec", playDurationSec),
-            new Parameter("score", currentScore));
-#else
-        WebAnalyticsBridge.LogModePause(mode, playDurationSec, currentScore);
-#endif
-    }
-
-    /// <summary>
-    /// 정상적으로 게임오버 화면까지 도달했을 때.
-    /// </summary>
-    public void LogGameOver(string mode, int finalScore, int maxCombo)
-    {
-#if UNITY_ANDROID || UNITY_EDITOR
-        LogEvent("game_over",
-            new Parameter("mode", mode),
-            new Parameter("final_score", finalScore),
-            new Parameter("max_combo", maxCombo)
-            );
-#else
-        WebAnalyticsBridge.LogGameOver(mode, finalScore, maxCombo);
-#endif
-    }
 
     #endregion
 
@@ -426,35 +293,8 @@ public class FirebaseManager : BaseManager
         Crashlytics.SetCustomKey("build_type", "RELEASE");
 #endif
     }
-
-    public void Log(string message)
-    {
-        Crashlytics.Log(message);
-    }
-
-    public void LogError(Exception e)
-    {
-        Crashlytics.LogException(e);
-    }
-
-    public void SetCustomKey(string key, string value)
-    {
-        Crashlytics.SetCustomKey(key, value);
-    }
 #else
     private void InitCrashlytics()
-    {
-    }
-
-    public void Log(string message)
-    {
-    }
-
-    public void LogError(Exception e)
-    {
-    }
-
-    public void SetCustomKey(string key, string value)
     {
     }
 #endif
@@ -503,15 +343,15 @@ public class FirebaseManager : BaseManager
         }
         return true;
     }
-    private async UniTask TryReportLeaderboard()
+    public async UniTask ReportScore(int score)
     {
-        if(await IsAuthenticated())
-            PlayGamesPlatform.Instance.ReportScore(ClassicScore, GPGSIds.leaderboard_high_score, ResultReportLeaderboard);
+        if (await IsAuthenticated())
+            PlayGamesPlatform.Instance.ReportScore(score, GPGSIds.leaderboard_high_score, ResultReportLeaderboard);
     }
 
     private void ResultReportLeaderboard(bool isComplete)
     {
-        LogEvent("report_leaderboard", "is_complete", isComplete.ToString());
+        Logging($"리더보드 보고 결과: {isComplete}");
     }
 
     public async UniTask ShowLeaderboardUI()
@@ -522,7 +362,7 @@ public class FirebaseManager : BaseManager
 #else
     public UniTask<bool> IsAuthenticated() => UniTask.FromResult(false);
 
-    private UniTask TryReportLeaderboard() => UniTask.CompletedTask;
+    public UniTask ReportScore(int score) => UniTask.CompletedTask;
 
     public UniTask ShowLeaderboardUI() => UniTask.CompletedTask;
 #endif
@@ -567,7 +407,7 @@ public class FirebaseManager : BaseManager
         }
         catch (Exception e)
         {
-            LogError(e);
+            Crashlytics.LogException(e);
             Warning($"강제 업데이트 체크 실패, 통과 처리: {e}");
             IsUpdate = true;
         }
@@ -646,7 +486,7 @@ public class FirebaseManager : BaseManager
         }
         catch (Exception e)
         {
-            LogError(e);
+            Crashlytics.LogException(e);
             Debug.LogError($"[InquiryManager] 문의 전송 실패: {e}");
             return InquiryResult.Fail(GameTextData.INQURIY_SEND_FAIL_4);
         }

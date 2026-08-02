@@ -45,11 +45,13 @@ public class SoundManager : ReferenceManager<SoundManager>
     }
 
     private float _sfxVolumPer;
-    private FirebaseManager m_firebaseManager;
-    public SoundManager(ManagerInitTracker tracker, AddressableManager addressablemanager, FirebaseManager firebaseManager) : base(tracker, addressablemanager)
+    private UserSettings m_userSettings;
+
+    public SoundManager(ManagerInitTracker tracker, AddressableManager addressablemanager, UserSettings userSettings)
+        : base(tracker, addressablemanager)
     {
         LLogger.Log("SoundManager");
-        m_firebaseManager = firebaseManager;
+        m_userSettings = userSettings;
     }
 
     public float SFXVolumPer
@@ -67,26 +69,26 @@ public class SoundManager : ReferenceManager<SoundManager>
 
     public bool IsBGMOn
     {
-        get { return m_firebaseManager.IsBGMOn; }
+        get { return m_userSettings.IsBGMOn; }
         set
         {
-            if (m_firebaseManager.IsBGMOn == value)
+            if (m_userSettings.IsBGMOn == value)
                 return;
 
-            m_firebaseManager.IsBGMOn = value;
+            m_userSettings.IsBGMOn = value;
             _bgmAudio.mute = !value;
         }
     }
 
     public bool IsSFXOn
     {
-        get { return m_firebaseManager.IsSFXOn; }
+        get { return m_userSettings.IsSFXOn; }
         set
         {
-            if (m_firebaseManager.IsSFXOn == value)
+            if (m_userSettings.IsSFXOn == value)
                 return;
 
-            m_firebaseManager.IsSFXOn = value;
+            m_userSettings.IsSFXOn = value;
             _sfxAudio.mute = !value;
         }
     }
@@ -108,9 +110,9 @@ public class SoundManager : ReferenceManager<SoundManager>
 
     async private UniTask LoadSaveFieldData()
     {
-        await UniTask.WaitUntil(() => m_firebaseManager.IsLoadData);
-        _bgmAudio.mute = !m_firebaseManager.IsBGMOn;
-        _sfxAudio.mute = !m_firebaseManager.IsSFXOn;
+        await CheckedManagers(ManagerType.UserSettings);
+        _bgmAudio.mute = !m_userSettings.IsBGMOn;
+        _sfxAudio.mute = !m_userSettings.IsSFXOn;
     }
 
     async public override UniTask LoadAssetReference()

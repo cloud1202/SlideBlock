@@ -7,48 +7,48 @@ using VContainer.Unity;
 
 public class GameManager : BaseManager
 {
-    private FirebaseManager m_firebaseManager;
     private InputManager m_inputManger;
     private PrefabManager m_prefabManager;
     private TelemetryManager m_telemetry;
+    private UserSettings m_userSettings;
 
     public GameManager(
         ManagerInitTracker tracker,
-        FirebaseManager firebaseManager,
         InputManager inputManger,
         PrefabManager prefabManager,
-        TelemetryManager telemetry) : base(tracker)
+        TelemetryManager telemetry,
+        UserSettings userSettings) : base(tracker)
     {
         LLogger.Log("GameManager");
-        m_firebaseManager = firebaseManager;
         m_inputManger = inputManger;
         m_prefabManager = prefabManager;
         m_telemetry = telemetry;
+        m_userSettings = userSettings;
         Bootstrap().Forget();
     }
 
     public int HighScore
     {
-        get => m_firebaseManager.ClassicScore;
+        get => m_userSettings.ClassicScore;
 
         set
         {
-            if (m_firebaseManager.ClassicScore == value)
+            if (m_userSettings.ClassicScore == value)
                 return;
 
-            m_firebaseManager.ClassicScore = value;
+            m_userSettings.ClassicScore = value;
         }
     }
     public bool IsSymbolOn
     {
-        get => m_firebaseManager.IsSymbolOn;
+        get => m_userSettings.IsSymbolOn;
 
         set
         {
-            if (m_firebaseManager.IsSymbolOn == value)
+            if (m_userSettings.IsSymbolOn == value)
                 return;
 
-            m_firebaseManager.IsSymbolOn = value;
+            m_userSettings.IsSymbolOn = value;
             _roundManager?.ChangeSymbolState();
         }
     }
@@ -64,27 +64,15 @@ public class GameManager : BaseManager
     {
         LLogger.Log("Bootstrap");
         ResolutionScreen.InitResolution();
-        //await UniTask.WaitUntil(() => m_firebaseManager.IsInitialized);
-        //m_firebaseManager.Log("AddressableManager Init");
-        //await AddressableManager.Instance.SetAddressable();
-        //m_firebaseManager.Log("PrefabManager Init");
-        //await PrefabManager.Instance.LoadAssetReference();
-        //m_firebaseManager.Log("SoundManager Init");
-        //await SoundManager.Instance.LoadAssetReference();
-        //m_firebaseManager.Log("TextDataManager Init");
-        //await TextDataManager.Instance.LoadAssetReference();
-        //m_firebaseManager.Log("PrefabManager Load");
-        //await PrefabManager.Instance.InitLoadObjects();
-        //m_firebaseManager.Log("Force Update Check");
-        //await m_firebaseManager.CheckForForceUpdateAsync();
-       //await UniTask.WaitUntil(() => m_firebaseManager?.IsUpdate ?? false);
+
         await CheckedManagers(
             ManagerType.Addressable,
             ManagerType.Prefab,
             ManagerType.Sound,
             ManagerType.TextData,
             ManagerType.Firebase,
-            ManagerType.Input
+            ManagerType.Input,
+            ManagerType.UserSettings
             );
 
         m_inputManger.SubscribeToInputHandler(InputType.Game_Exit, OnClickExit);
@@ -93,7 +81,6 @@ public class GameManager : BaseManager
         _loadingUI = await m_prefabManager.InstantiateStaticUI<IBaseUI>(PrefabData.LoadingUI);
         _lobbyUI.Init();
         _loadingUI.Init();
-        await UniTask.WaitUntil(() => m_firebaseManager.IsLoadData);
         await UniTask.WaitForSeconds(2f);
         _loadingUI.Close();
     }
