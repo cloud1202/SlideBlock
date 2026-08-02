@@ -14,7 +14,7 @@ public class InputManager : BaseManager
         LLogger.Log("InputManager");
         _inputHandler = new PlayerInput();
         _inputHandler.Player.Enable();
-        _inputHandler.Player.Exit.performed += OnBackKeyPerformed;
+        SubscribeToInputHandler(InputType.Game_Exit, perform: OnBackKeyPerformed);
         CompleteInit(ManagerType.Input);
     }
 
@@ -48,7 +48,7 @@ public class InputManager : BaseManager
         if (_backHandlers.Count == 0)
             return;
 
-        _backHandlers[_backHandlers.Count - 1].Invoke();
+        _backHandlers[^1].Invoke();
     }
 
     #endregion
@@ -84,18 +84,6 @@ public class InputManager : BaseManager
     }
 
     #endregion
-
-    public bool UseInputHandler
-    {
-        set
-        {
-            if (value)
-                _inputHandler.Player.Enable();
-            else
-                _inputHandler.Player.Disable();
-        }
-    }
-
 
     public void SubscribeToInputHandler(InputType type, 
         Action<CallbackContext> start = null, 

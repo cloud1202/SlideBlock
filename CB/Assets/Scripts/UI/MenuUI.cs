@@ -2,38 +2,32 @@ using Cysharp.Threading.Tasks;
 using UnityEngine;
 using VContainer;
 
-public class MenuUI : BaseUI
+public class MenuUI : CloseBaseUI
 {
     [SerializeField] private SlideToggle _symbolToggle;
     private IBaseUI _inquriyUI;
 
     private GameManager m_gameManager;
     private PrefabManager m_prefabManager;
-    private SoundManager m_soundManager;
-    private InputManager m_inputManager;
 
     [Inject]
-    public void Construct(GameManager gameManager, PrefabManager prefabManager, SoundManager soundManager, InputManager inputManager)
+    public void Construct(GameManager gameManager, PrefabManager prefabManager)
     {
         m_gameManager = gameManager;
         m_prefabManager = prefabManager;
-        m_soundManager = soundManager;
-        m_inputManager = inputManager;
     }
     private void Awake()
     {
-        _symbolToggle.SetValueWithoutNotify(m_gameManager.IsSymbolOn);
         _symbolToggle.OnValueChanged += OnSymbolToggleChanged;
     }
-
-    private void OnDestroy()
+    protected override void OnDestroyed()
     {
         _symbolToggle.OnValueChanged -= OnSymbolToggleChanged;
     }
 
     public override void Init()
     {
-        m_inputManager.UseInputHandler = false;
+        _symbolToggle.SetValueWithoutNotify(m_gameManager.IsSymbolOn);
         InitLoadUI().Forget();
     }
 
@@ -68,9 +62,14 @@ public class MenuUI : BaseUI
         OnClickCloseBtn();
     }
 
+    public override void Close()
+    {
+        _inquriyUI?.Close();
+        base.Close();
+    }
+
     public void OnClickCloseBtn()
     {
-        base.Close();
-        m_inputManager.UseInputHandler = true;
+        Close();
     }
 }

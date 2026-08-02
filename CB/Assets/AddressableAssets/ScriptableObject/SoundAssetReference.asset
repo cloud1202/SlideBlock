@@ -29,6 +29,14 @@ MonoBehaviour:
       m_SubObjectGUID: 
       m_EditorAssetChanged: 0
     containLabel: 1
+  - id: 2
+    data:
+      m_AssetGUID: f06c42edf58ba7f438605321b1daa325
+      m_SubObjectName: 
+      m_SubObjectType: 
+      m_SubObjectGUID: 
+      m_EditorAssetChanged: 0
+    containLabel: 1
   - id: 100
     data:
       m_AssetGUID: 77e80f685a30bb0488b87e59bb201d34

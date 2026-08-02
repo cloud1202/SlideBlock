@@ -10,15 +10,13 @@ public class GameOverUI : BaseUI, IScore
     [SerializeField] private TextMeshProUGUI _combo;
 
     private GameManager m_gameManager;
-    private PrefabManager m_prefabManager;
     private SoundManager m_soundManager;
     private AdmobManager m_adMobManager;
 
     [Inject]
-    public void Construct(GameManager gameManager, PrefabManager prefabManager, SoundManager soundManager, AdmobManager adMobManager)
+    public void Construct(GameManager gameManager, SoundManager soundManager, AdmobManager adMobManager)
     {
         m_gameManager = gameManager;
-        m_prefabManager = prefabManager;
         m_soundManager = soundManager;
         m_adMobManager = adMobManager;
     }
@@ -27,7 +25,7 @@ public class GameOverUI : BaseUI, IScore
         _highScore.Init();
         base.Init();
         SetScore(0);
-        m_soundManager.PlayBGM().Forget();
+        m_soundManager.PlayBGM(SoundData.GameOver).Forget();
     }
 
     public void SetScores() { }

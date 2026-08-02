@@ -1,9 +1,8 @@
-using Cysharp.Threading.Tasks;
 using TMPro;
 using UnityEngine;
 using VContainer;
 
-public class PopupNoticeUI : BaseUI, IPopupNotice
+public class PopupNoticeUI : CloseBaseUI, IPopupNotice
 {
     [SerializeField] private TextMeshProUGUI _content;
     [SerializeField] private RectTransform _panel;

@@ -1,6 +1,6 @@
 using UnityEngine;
 
-public class LegalUI : BaseUI
+public class LegalUI : CloseBaseUI
 {
     private const string PRIVACY_POLICY = "https://layoncraft.github.io/PrivacyPolicy/SlideBlock";
     private const string TERMS = "https://layoncraft.github.io/Terms/SlideBlock";
@@ -14,6 +14,6 @@ public class LegalUI : BaseUI
     }
     public void OnClickCloseBtn()
     {
-        base.Close();
+        Close();
     }
 }

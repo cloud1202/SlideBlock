@@ -1,10 +1,9 @@
 using System;
 using TMPro;
 using UnityEngine;
-using UnityEngine.InputSystem;
 using VContainer;
 
-public class PopupQuestionUI : BaseUI, IPopupQuestion
+public class PopupQuestionUI : CloseBaseUI, IPopupQuestion
 {
     [SerializeField] private TextMeshProUGUI _content;
     [SerializeField] private RectTransform _panel;
@@ -15,24 +14,10 @@ public class PopupQuestionUI : BaseUI, IPopupQuestion
     private Action _onClickNo;
 
     protected TextDataManager m_textDataManager;
-    protected InputManager m_inputManager;
     [Inject]
-    public void Construct(TextDataManager textDataManager, InputManager inputManager)
+    public void Construct(TextDataManager textDataManager)
     {
         m_textDataManager = textDataManager;
-		m_inputManager = inputManager;
-    }
-    public override void Init()
-    {
-        m_inputManager.SubscribeToInputHandler(InputType.Game_Exit, OnClickBackKey);
-        base.Init();
-    }
-
-    public override void Close()
-    {
-        m_inputManager.UnsubscribeToInputHandler(InputType.Game_Exit, OnClickBackKey);
-        base.Close();
-        Destroy(this.gameObject);
     }
 
     public void SetNoticeContent(GameTextData content)
@@ -48,23 +33,27 @@ public class PopupQuestionUI : BaseUI, IPopupQuestion
         Init();
     }
 
-    private void OnClickBackKey(InputAction.CallbackContext callback)
+    public override void Close()
     {
-        OnClickCloseBtn();
+        _onClickNo?.Invoke();
+        base.Close();
+        Destroy(this.gameObject);
     }
 
     public void OnClickCloseBtn()
     {
-        _onClickNo?.Invoke();
         Close();
     }
+
     public void OnClickYesBtn()
     {
         _onClickYes?.Invoke();
+        _onClickNo = null;
         Close();
     }
+
     public void OnClickNoBtn()
     {
-        OnClickCloseBtn();
+        Close();
     }
 }

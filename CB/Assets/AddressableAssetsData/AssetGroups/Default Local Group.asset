@@ -28,7 +28,7 @@ MonoBehaviour:
     - default
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 27a1936d0202df34480dd0484354023a
-    m_Address: Assets/AddressableAssets/Sound/Casual Music Loop 12.wav
+    m_Address: Assets/AddressableAssets/Sound/IngameBGM.wav
     m_ReadOnly: 0
     m_SerializedLabels:
     - default
@@ -58,7 +58,7 @@ MonoBehaviour:
     - default
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: d65d2ad762354a843bcc8c0a63557876
-    m_Address: Assets/AddressableAssets/Sound/Casual Music Loop 07.wav
+    m_Address: Assets/AddressableAssets/Sound/LobbyBGM.wav
     m_ReadOnly: 0
     m_SerializedLabels:
     - default
@@ -68,6 +68,11 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels:
     - default
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: f06c42edf58ba7f438605321b1daa325
+    m_Address: Assets/AddressableAssets/Sound/GameOverBGM.wav
+    m_ReadOnly: 0
+    m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
   m_ReadOnly: 0
   m_Settings: {fileID: 11400000, guid: 45892279842002343aa019c513c76832, type: 2}

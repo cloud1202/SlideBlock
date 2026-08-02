@@ -40,15 +40,13 @@ public class Board : RoundObject
     }
     private BoardDirection _boardDirection = BoardDirection.None;
 
-    private GameManager m_gameManager;
     private PrefabManager m_prefabManager;
     private SoundManager m_soundManager;
     private InputManager m_inputManager;
 
     [Inject]
-    public void Construct(GameManager gameManager, PrefabManager prefabManager, SoundManager soundManager, InputManager inputManager)
+    public void Construct(PrefabManager prefabManager, SoundManager soundManager, InputManager inputManager)
     {
-        m_gameManager = gameManager;
         m_prefabManager = prefabManager;
         m_soundManager = soundManager;
         m_inputManager = inputManager;

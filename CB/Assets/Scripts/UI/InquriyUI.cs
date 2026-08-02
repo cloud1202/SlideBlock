@@ -3,22 +3,18 @@ using TMPro;
 using UnityEngine;
 using VContainer;
 
-public class InquriyUI : BaseUI
+public class InquriyUI : CloseBaseUI
 {
     [SerializeField] private TMP_InputField _email;
     [SerializeField] private TMP_InputField _content;
 
-    private GameManager m_gameManager;
     private PrefabManager m_prefabManager;
-    private SoundManager m_soundManager;
     private FirebaseManager m_firebaseManager;
 
     [Inject]
-    public void Construct(GameManager gameManager, PrefabManager prefabManager, SoundManager soundManager, FirebaseManager firebaseManager)
+    public void Construct(PrefabManager prefabManager, FirebaseManager firebaseManager)
     {
-        m_gameManager = gameManager;
         m_prefabManager = prefabManager;
-        m_soundManager = soundManager;
         m_firebaseManager = firebaseManager;
     }
     public override void Init()
@@ -27,6 +23,7 @@ public class InquriyUI : BaseUI
         _content.text = string.Empty;
         base.Init();
     }
+
     public void OnClickSendBtn()
     {
         SendInquiry().Forget();
@@ -34,7 +31,7 @@ public class InquriyUI : BaseUI
 
     public void OnClickBackBtn()
     {
-        base.Close();
+        Close();
     }
 
     async private UniTask SendInquiry()
