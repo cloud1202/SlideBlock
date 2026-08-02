@@ -9,11 +9,11 @@ public class AdmobManager : BaseManager
     public bool IsPrivacyOptionsRequire = ConsentInformation.PrivacyOptionsRequirementStatus == PrivacyOptionsRequirementStatus.Required;
 
     private BannerView bannerView;
-    private FirebaseManager m_firebaseManager;
-    public AdmobManager(ManagerInitTracker tracker, FirebaseManager firebaseManager) : base(tracker)
+    private TelemetryManager m_telemetry;
+    public AdmobManager(ManagerInitTracker tracker, TelemetryManager telemetry) : base(tracker)
     {
         Logging("Admob 초기화");
-        m_firebaseManager = firebaseManager;
+        m_telemetry = telemetry;
         RequestConsent();
     }
 
@@ -30,7 +30,7 @@ public class AdmobManager : BaseManager
 
     private void CreateBanner()
     {
-        m_firebaseManager.Log("Bottom Admob Banner Create");
+        m_telemetry.Log("Bottom Admob Banner Create");
 #if UNITY_EDITOR
         string adUnitId = "ca-app-pub-3940256099942544/6300978111";
 
@@ -46,7 +46,7 @@ public class AdmobManager : BaseManager
 
     async public UniTask CreateInterstitial(float delay = 0f)
     {
-        m_firebaseManager.Log("Update High Score Admob Create");
+        m_telemetry.Log("Update High Score Admob Create");
         await UniTask.WaitForSeconds(delay);
         var adRequest = new AdRequest();
 #if UNITY_EDITOR

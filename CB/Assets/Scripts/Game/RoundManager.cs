@@ -7,7 +7,7 @@ public class RoundManager : MonoBehaviour, IRound
 {
     private GameManager m_gameManager;
     private PrefabManager m_prefabManager;
-    private FirebaseManager m_firebaseManager;
+    private TelemetryManager m_telemetry;
     public int CurrentScore => _scoreValue;
     public event Action OnUpdateSymbolState;
     private const float COMBO_DELAY = 5f;
@@ -21,11 +21,11 @@ public class RoundManager : MonoBehaviour, IRound
     private TimerModule _timer;
 
     [Inject]
-    public void Construct(GameManager gameManager, PrefabManager prefabManager, FirebaseManager firebaseManager)
+    public void Construct(GameManager gameManager, PrefabManager prefabManager, TelemetryManager telemetry)
     {
         m_gameManager = gameManager;
         m_prefabManager = prefabManager;
-        m_firebaseManager = firebaseManager;
+        m_telemetry = telemetry;
     }
     async public UniTask Init()
     {
@@ -50,7 +50,7 @@ public class RoundManager : MonoBehaviour, IRound
     public void EnterRound()
     {
         m_gameManager.catureEnterTime = Time.realtimeSinceStartup;
-        m_firebaseManager.LogModeStart("Classic");
+        m_telemetry.LogModeStart("Classic");
         gameObject.SetActive(true);
         _scoreValue = 0;
         _comboValue = 0;
@@ -61,8 +61,8 @@ public class RoundManager : MonoBehaviour, IRound
 
     public void EndRound()
     {
-        m_firebaseManager.SetCustomKey("mode", "Classic");
-        m_firebaseManager.LogGameOver("Classic", _scoreValue, _maxCombo);
+        m_telemetry.SetCustomKey("mode", "Classic");
+        m_telemetry.LogGameOver("Classic", _scoreValue, _maxCombo);
         _ingameUI.Close();
         gameObject.SetActive(false);
         _gameOver.Init();
@@ -72,7 +72,7 @@ public class RoundManager : MonoBehaviour, IRound
 
     public void ExitRound()
     {
-        m_firebaseManager.LogModeQuit("Classic", Time.realtimeSinceStartup - m_gameManager.catureEnterTime, _scoreValue);
+        m_telemetry.LogModeQuit("Classic", Time.realtimeSinceStartup - m_gameManager.catureEnterTime, _scoreValue);
         _ingameUI.Close();
         _gameOver.Close();
         Destroy(gameObject);
@@ -83,7 +83,7 @@ public class RoundManager : MonoBehaviour, IRound
         UpdateCombo(addScore > 0, boundCenter);
 
         _scoreValue += Utility.CalcScore(addScore, _comboValue);
-        m_firebaseManager.SetCustomKey("score", _scoreValue.ToString());
+        m_telemetry.SetCustomKey("score", _scoreValue.ToString());
         _ingameUI.SetScore(_scoreValue);
     }
 

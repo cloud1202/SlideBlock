@@ -10,12 +10,20 @@ public class GameManager : BaseManager
     private FirebaseManager m_firebaseManager;
     private InputManager m_inputManger;
     private PrefabManager m_prefabManager;
-    public GameManager(ManagerInitTracker tracker, FirebaseManager firebaseManager, InputManager inputManger, PrefabManager prefabManager) : base(tracker)
+    private TelemetryManager m_telemetry;
+
+    public GameManager(
+        ManagerInitTracker tracker,
+        FirebaseManager firebaseManager,
+        InputManager inputManger,
+        PrefabManager prefabManager,
+        TelemetryManager telemetry) : base(tracker)
     {
         LLogger.Log("GameManager");
         m_firebaseManager = firebaseManager;
         m_inputManger = inputManger;
         m_prefabManager = prefabManager;
+        m_telemetry = telemetry;
         Bootstrap().Forget();
     }
 
@@ -143,15 +151,15 @@ public class GameManager : BaseManager
         PlayerPrefs.Save();
 
         if (_roundManager != null)
-            m_firebaseManager.LogModePause("Classic", Time.realtimeSinceStartup - catureEnterTime, _roundManager.CurrentScore);
+            m_telemetry.LogModePause("Classic", Time.realtimeSinceStartup - catureEnterTime, _roundManager.CurrentScore);
 
-        m_firebaseManager.Log("App paused");
+        m_telemetry.Log("App paused");
     }
 
     private void OnApplicationQuit()
     {
         PlayerPrefs.Save();
-        m_firebaseManager.LogEvent("app_quit","real_time", Time.realtimeSinceStartup.ToString());
+        m_telemetry.LogEvent("app_quit", "real_time", Time.realtimeSinceStartup.ToString());
     }
 
     public void Dispose()

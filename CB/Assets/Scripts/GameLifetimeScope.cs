@@ -9,6 +9,7 @@ public class GameLifetimeScope : LifetimeScope
         builder.RegisterEntryPoint<ManagerInitTracker>(Lifetime.Singleton).AsSelf();
         builder.RegisterEntryPoint<AddressableManager>(Lifetime.Singleton).AsSelf();
         builder.RegisterEntryPoint<FirebaseManager>(Lifetime.Singleton).AsSelf();
+        builder.RegisterEntryPoint<TelemetryManager>(Lifetime.Singleton).AsSelf();
         builder.RegisterEntryPoint<AdmobManager>(Lifetime.Singleton).AsSelf();
         builder.RegisterEntryPoint<InputManager>(Lifetime.Singleton).AsSelf();
         builder.RegisterEntryPoint<PrefabManager>(Lifetime.Singleton).AsSelf();
