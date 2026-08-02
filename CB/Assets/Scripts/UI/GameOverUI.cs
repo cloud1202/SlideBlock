@@ -34,17 +34,17 @@ public class GameOverUI : BaseUI, IScore
 
     public void SetScore(int score)
     {
-        //if (GameManager.Instance.HighScore < score)
-        //{
-        //    UpdateHighScore(score);
-        //}
+        if (m_gameManager.HighScore < score)
+        {
+            UpdateHighScore(score);
+        }
         _score.text = Utility.NumberRegularExpression(score);
     }
 
     private void UpdateHighScore(int score)
     {
         m_soundManager.PlaySFX(SoundData.Confetti).Forget();
-       // GameManager.Instance.HighScore = score;
+        m_gameManager.HighScore = score;
         _highScore.Burst();
 
 #if UNITY_ANDROID || UNITY_EDITOR
@@ -59,13 +59,13 @@ public class GameOverUI : BaseUI, IScore
 
     public void OnClickRetryBtn()
     {
-        //GameManager.Instance.StartRound().Forget();
+        m_gameManager.StartRound().Forget();
         OnClickCloseBtn();
     }
 
     public void OnClickHomeBtn()
     {
-        //GameManager.Instance.ExitRound();
+        m_gameManager.ExitRound();
         OnClickCloseBtn();
     }
 

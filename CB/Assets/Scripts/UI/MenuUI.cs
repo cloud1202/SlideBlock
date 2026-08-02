@@ -22,7 +22,7 @@ public class MenuUI : BaseUI
     }
     private void Awake()
     {
-        //_symbolToggle.SetValueWithoutNotify(GameManager.Instance.IsSymbolOn);
+        _symbolToggle.SetValueWithoutNotify(m_gameManager.IsSymbolOn);
         _symbolToggle.OnValueChanged += OnSymbolToggleChanged;
     }
 
@@ -47,7 +47,7 @@ public class MenuUI : BaseUI
 
     private void OnSymbolToggleChanged(bool value)
     {
-        //GameManager.Instance.IsSymbolOn = value;
+        m_gameManager.IsSymbolOn = value;
     }
 
 
@@ -58,13 +58,13 @@ public class MenuUI : BaseUI
 
     public void OnClickRetryBtn()
     {
-       // GameManager.Instance.StartRound().Forget();
+        m_gameManager.StartRound().Forget();
         OnClickCloseBtn();
     }
 
     public void OnClickHomeBtn()
     {
-        //GameManager.Instance.ExitRound();
+        m_gameManager.ExitRound();
         OnClickCloseBtn();
     }
 
