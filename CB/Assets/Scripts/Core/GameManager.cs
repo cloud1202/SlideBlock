@@ -1,7 +1,6 @@
 using Cysharp.Threading.Tasks;
 using System.Threading;
 using UnityEngine;
-using UnityEngine.InputSystem;
 using VContainer;
 using VContainer.Unity;
 
@@ -75,7 +74,7 @@ public class GameManager : BaseManager
             ManagerType.UserSettings
             );
 
-        m_inputManger.SubscribeToInputHandler(InputType.Game_Exit, OnClickExit);
+        m_inputManger.PushBackHandler(OnBackKey);
         CompleteInit(ManagerType.Game);
         _lobbyUI = await m_prefabManager.InstantiateStaticUI<IBaseUI>(PrefabData.LobbyUI);
         _loadingUI = await m_prefabManager.InstantiateStaticUI<IBaseUI>(PrefabData.LoadingUI);
@@ -106,7 +105,7 @@ public class GameManager : BaseManager
         _lobbyUI.Init();
     }
 
-    private void OnClickExit(InputAction.CallbackContext callback)
+    private void OnBackKey()
     {
         ShowExitToast().Forget();
     }
