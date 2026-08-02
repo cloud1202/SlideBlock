@@ -28,6 +28,13 @@ public class FirebaseManager : BaseManager
 
 #if UNITY_ANDROID || UNITY_EDITOR
     private FirebaseFirestore _firestore;
+
+    /// <summary>
+    /// 반환한 UserData가 Firestore 문서에서 왔는지 여부.
+    /// 인증 대기 시간 초과로 PlayerPrefs 기반 로컬 UserData를 돌려준 경우 false로 남으며,
+    /// 이때 SaveUser는 로컬 값으로 클라우드 문서를 덮어쓰지 않도록 저장을 거부한다.
+    /// </summary>
+    private bool _userDocumentLoaded;
 #endif
     private const string USERS_COLLECTION = "users";
     private const string MAIL_COLLECTION = "mail";
@@ -204,9 +211,9 @@ public class FirebaseManager : BaseManager
     {
 #if UNITY_ANDROID || UNITY_EDITOR
         PlayerPrefs.Save();
-        if (!IsInitialized || string.IsNullOrEmpty(UserId) || user == null)
+        if (!IsInitialized || string.IsNullOrEmpty(UserId) || user == null || !_userDocumentLoaded)
         {
-            Warning("Firestore 저장 실패: 아직 초기화/로그인되지 않음");
+            Warning("Firestore 저장 실패: 아직 초기화/로그인되지 않았거나 유저 문서를 읽지 못했음");
             return;
         }
         LLogger.Log("Save Firestore");
@@ -261,12 +268,15 @@ public class FirebaseManager : BaseManager
             if (snapshot.Exists)
             {
                 Logging("유저 데이터 로드 완료");
+                _userDocumentLoaded = true;
                 return snapshot.ConvertTo<UserData>();
             }
 
             Logging("신규 유저, 초기 문서 생성");
             var created = new UserData();
             created.CreatedAt = Timestamp.GetCurrentTimestamp();
+            // SaveUser의 가드가 이 플래그를 보므로 최초 문서 저장 전에 세운다.
+            _userDocumentLoaded = true;
             SaveUser(created);
             return created;
         }
