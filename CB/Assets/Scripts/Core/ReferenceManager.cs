@@ -2,7 +2,6 @@ using Cysharp.Threading.Tasks;
 using System.Collections.Generic;
 using System.Threading;
 using UnityEngine;
-using VContainer;
 
 public class ReferenceManager<T> : BaseManager
 {
@@ -18,9 +17,7 @@ public class ReferenceManager<T> : BaseManager
         Init().Forget();
     }
 
-    async protected virtual UniTask Init()
-    {
-    }
+    async protected virtual UniTask Init() => await UniTask.Yield();
 
     async public virtual UniTask LoadAssetReference()
     {

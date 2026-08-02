@@ -35,6 +35,9 @@ public class FirebaseManager : BaseManager
     /// 이때 SaveUser는 로컬 값으로 클라우드 문서를 덮어쓰지 않도록 저장을 거부한다.
     /// </summary>
     private bool _userDocumentLoaded;
+
+    /// <summary>저장 차단 경고를 세션당 한 번만 남기기 위한 플래그.</summary>
+    private bool _saveRefusalWarned;
 #endif
     private const string USERS_COLLECTION = "users";
     private const string MAIL_COLLECTION = "mail";
@@ -45,6 +48,20 @@ public class FirebaseManager : BaseManager
 
 
     private UniTaskCompletionSource<bool> _authTcs;
+
+#if UNITY_ANDROID || UNITY_EDITOR
+    /// <summary>
+    /// 최초 인증의 완료 신호. 성공·실패·백스톱 타임아웃 등 모든 종료 지점에서 완료된다.
+    /// 기기에서의 인증은 Authenticate → RequestServerSideAccess → SignInAndRetrieveData로
+    /// 이어지는 3단 콜백 체인이라 완료를 관측할 방법이 없었고, 그래서 이전에는 UserId 필드를
+    /// 폴링해야 했다. 이 신호가 그 폴링과 임의의 대기 시간을 대체한다.
+    /// </summary>
+    private readonly UniTaskCompletionSource<bool> _initialAuth = new UniTaskCompletionSource<bool>();
+
+    /// <summary>최초 인증이 끝날 때까지 기다린다. 성공 여부를 돌려주며 예외를 던지지 않는다.</summary>
+    public UniTask<bool> WaitForAuthAsync() => _initialAuth.Task;
+#endif
+
     /// <summary>
     /// 닉네임 설정용 캐시. 랭킹 기록 시 같이 올라감. SetNickname()으로 변경 가능.
     /// </summary>
@@ -97,6 +114,7 @@ public class FirebaseManager : BaseManager
             UserId = auth.CurrentUser.UserId;
             Logging($"[Editor] 기존 세션 재사용: {UserId}");
             Crashlytics.SetUserId(UserId);
+            _initialAuth.TrySetResult(true);
             return;
         }
 
@@ -107,12 +125,28 @@ public class FirebaseManager : BaseManager
         {
             UserId = savedUid;
             Logging($"[Editor] 저장된 UID 재사용: {UserId}");
+            _initialAuth.TrySetResult(true);
             return;
         }
 #endif
 
-        if (TryPlayGamesAuthentication())
-            return;
+        // 콜백 체인이 영영 돌아오지 않는 경우(SDK 홀드, 네트워크 대기)를 대비한 백스톱.
+        // 정상 경로에서는 아래 콜백들이 먼저 신호를 완료하므로 이 타이머는 지고 끝난다.
+        ArmAuthTimeoutAsync().Forget();
+
+        TryPlayGamesAuthentication();
+    }
+
+    /// <summary>
+    /// 인증 신호가 제한 시간 안에 오지 않으면 실패로 확정한다.
+    /// TrySetResult가 true를 돌려준 경우에만 이 타이머가 이긴 것이므로 그때만 경고한다.
+    /// </summary>
+    private async UniTaskVoid ArmAuthTimeoutAsync()
+    {
+        await UniTask.Delay(TimeSpan.FromSeconds(AUTH_WAIT_SECONDS), ignoreTimeScale: true);
+
+        if (_initialAuth.TrySetResult(false))
+            Warning($"인증 신호가 {AUTH_WAIT_SECONDS}초 안에 오지 않았다. 로컬 데이터로 진행한다.");
     }
 
     public UniTask<bool> ManuallyAuthenticationAsync()
@@ -125,19 +159,23 @@ public class FirebaseManager : BaseManager
         return _authTcs.Task;
     }
 
-    private bool TryPlayGamesAuthentication()
+    /// <summary>
+    /// PlayGames 인증을 시작한다. 결과는 ProcessAuthentication 콜백으로 돌아오므로
+    /// 이 메서드의 반환 시점에는 아직 인증이 끝나지 않았다. 완료는 _initialAuth로 관측한다.
+    /// </summary>
+    private void TryPlayGamesAuthentication()
     {
         try
         {
             PlayGamesPlatform.Activate();
             PlayGamesPlatform.Instance.Authenticate(ProcessAuthentication);
-            return PlayGamesPlatform.Instance.IsAuthenticated();
         }
         catch (Exception e)
         {
             Crashlytics.LogException(e);
             Logging(e.ToString());
-            return false;
+            // 예외가 나면 콜백이 오지 않는다. 백스톱을 기다리지 말고 즉시 실패로 확정한다.
+            _initialAuth.TrySetResult(false);
         }
     }
 
@@ -164,9 +202,6 @@ public class FirebaseManager : BaseManager
             Logging("PlayGames Login Failed");
             auth.SignInAnonymouslyAsync().ContinueWithOnMainThread(SignInAuth);
             Nickname = string.Empty;
-            // Disable your integration with Play Games Services or show a login
-            // button to ask users to sign-in. Clicking it should call
-            // PlayGamesPlatform.Instance.ManuallyAuthenticate(ProcessAuthentication).
         }
     }
 
@@ -175,12 +210,14 @@ public class FirebaseManager : BaseManager
         if (task.IsCanceled)
         {
             _authTcs?.TrySetResult(false);
+            _initialAuth.TrySetResult(false);
             Error("SignInAndRetrieveDataWithCredentialAsync was canceled.");
             return;
         }
         if (task.IsFaulted)
         {
             _authTcs?.TrySetResult(false);
+            _initialAuth.TrySetResult(false);
             Error("SignInAndRetrieveDataWithCredentialAsync encountered an error: " + task.Exception);
             return;
         }
@@ -196,6 +233,14 @@ public class FirebaseManager : BaseManager
         Crashlytics.SetUserId(UserId);
 
         _authTcs?.TrySetResult(!string.IsNullOrEmpty(Nickname));
+
+        // TrySetResult가 false를 돌려주면 백스톱 타임아웃이 이미 실패로 확정한 뒤다.
+        // 즉 인증이 뒤늦게 성공한 경우이며, 이 세션은 유저 문서를 읽지 못한 채로 남아 있다.
+        // 로컬 값으로 클라우드를 덮어쓰지 않도록 저장은 계속 막히며, 병합 정책이 정해지면
+        // 이 지점이 복구를 거는 자리다.
+        if (!_initialAuth.TrySetResult(true))
+            Warning("인증이 백스톱 타임아웃 이후에 완료됐다. 이 세션은 클라우드 저장이 계속 차단된다.");
+
         Logging($"User signed in successfully: {result.User.DisplayName} ({result.User.UserId})");
     }
 #endif
@@ -213,7 +258,13 @@ public class FirebaseManager : BaseManager
         PlayerPrefs.Save();
         if (!IsInitialized || string.IsNullOrEmpty(UserId) || user == null || !_userDocumentLoaded)
         {
-            Warning("Firestore 저장 실패: 아직 초기화/로그인되지 않았거나 유저 문서를 읽지 못했음");
+            // 이 상태는 세션 내내 유지되므로 setter를 누를 때마다 경고가 쌓인다. 한 번만 남긴다.
+            if (!_saveRefusalWarned)
+            {
+                _saveRefusalWarned = true;
+                Warning("Firestore 저장 차단: 초기화/로그인 미완료이거나 유저 문서를 읽지 못했다. "
+                      + "이 세션의 변경은 로컬에만 저장된다.");
+            }
             return;
         }
         LLogger.Log("Save Firestore");
@@ -234,22 +285,22 @@ public class FirebaseManager : BaseManager
     private const float AUTH_WAIT_SECONDS = 10f;
 
     /// <summary>
-    /// 유저 문서를 읽어온다. 인증이 끝나지 않았으면 최대 AUTH_WAIT_SECONDS 대기하고,
-    /// 그래도 안 되면 PlayerPrefs 기반 로컬 UserData를 돌려준다. 절대 null을 반환하지 않는다.
+    /// 유저 문서를 읽어온다. 인증 완료 신호를 기다렸다가, 성공했으면 Firestore 문서를,
+    /// 실패했으면 PlayerPrefs 기반 로컬 UserData를 돌려준다. 절대 null을 반환하지 않는다.
     /// </summary>
     public async UniTask<UserData> LoadUserAsync()
     {
 #if UNITY_ANDROID || UNITY_EDITOR
+        // IsInitialized가 false면 SignInAuth 자체가 호출되지 않아 신호가 완료되지 않는다.
+        // 이 검사가 그 경우의 무한 대기를 막는다.
         if (IsInitialized)
         {
-            float deadline = Time.realtimeSinceStartup + AUTH_WAIT_SECONDS;
-            await UniTask.WaitUntil(() =>
-                !string.IsNullOrEmpty(UserId) || Time.realtimeSinceStartup > deadline);
+            bool authenticated = await WaitForAuthAsync();
 
-            if (!string.IsNullOrEmpty(UserId))
+            if (authenticated && !string.IsNullOrEmpty(UserId))
                 return await FetchUserDocumentAsync();
 
-            Warning("인증 대기 시간 초과. 로컬 데이터로 진행한다.");
+            Warning("인증에 실패했다. 로컬 데이터로 진행한다.");
         }
 #endif
         Logging("로컬 PlayerPrefs 기반 UserData로 진행");
@@ -265,23 +316,45 @@ public class FirebaseManager : BaseManager
         {
             var snapshot = await docRef.GetSnapshotAsync().AsUniTask();
 
+            // SaveUser의 가드가 이 플래그를 보므로, 아래에서 저장하기 전에 세운다.
+            _userDocumentLoaded = true;
+
             if (snapshot.Exists)
             {
+                var remote = snapshot.ConvertTo<UserData>();
+                var local = new UserData();   // PlayerPrefs 기반 스냅샷
+
+                // 이전 실행이 오프라인이었거나 인증이 늦어 클라우드 저장이 막혔다면, 그 세션의
+                // 변경은 PlayerPrefs에만 남아 있고 LastPlayed가 원격보다 최신이다. 그대로
+                // 원격을 채택하면 그 진행이 사라지므로, 최종 플레이 시각으로 최신본을 고른다.
+                if (local.LastPlayed > remote.LastPlayed)
+                {
+                    // createdAt은 로컬에 기록하지 않으므로 원격 값을 유지한다.
+                    // 그러지 않으면 MergeAll 저장이 기본값으로 덮어쓴다.
+                    local.CreatedAt = remote.CreatedAt;
+
+                    Warning($"로컬 데이터가 더 최신이다(로컬 {local.LastPlayed}, 원격 {remote.LastPlayed}). "
+                          + "로컬을 채택하고 클라우드에 반영한다.");
+                    SaveUser(local);
+                    return local;
+                }
+
                 Logging("유저 데이터 로드 완료");
-                _userDocumentLoaded = true;
-                return snapshot.ConvertTo<UserData>();
+                return remote;
             }
 
             Logging("신규 유저, 초기 문서 생성");
             var created = new UserData();
             created.CreatedAt = Timestamp.GetCurrentTimestamp();
-            // SaveUser의 가드가 이 플래그를 보므로 최초 문서 저장 전에 세운다.
-            _userDocumentLoaded = true;
+            created.TouchLastPlayed();
             SaveUser(created);
             return created;
         }
         catch (Exception e)
         {
+            // 역직렬화 도중 던지면 플래그가 이미 선 채로 여기 떨어질 수 있다. 문서를 신뢰할 수
+            // 없는 상태이므로 되돌려, 로컬 값이 클라우드를 덮어쓰지 못하게 저장 차단을 유지한다.
+            _userDocumentLoaded = false;
             Crashlytics.LogException(e);
             Error(e.ToString());
             return new UserData();
@@ -474,6 +547,16 @@ public class FirebaseManager : BaseManager
         }
 
 #if UNITY_ANDROID || UNITY_EDITOR
+        // 의존성 실패 분기도 CompleteInit(Firebase)로 게이트를 열기 때문에, Firebase가
+        // 초기화되지 않은 상태로도 게임이 여기까지 도달할 수 있다. 그 경우 _firestore가
+        // null이라 역참조하면 NRE가 나는데, 아래 catch의 Crashlytics.LogException도
+        // 같은 분기에서 InitCrashlytics()를 거치지 않아 예외가 밖으로 샌다.
+        if (!IsInitialized)
+        {
+            Warning("Firebase가 초기화되지 않아 문의를 전송할 수 없다.");
+            return InquiryResult.Fail(GameTextData.INQURIY_SEND_FAIL_4);
+        }
+
         try
         {
             var body = BuildEmailBody(content, userEmail);

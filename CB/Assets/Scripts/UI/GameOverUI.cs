@@ -70,6 +70,6 @@ public class GameOverUI : BaseUI, IScore
     public void OnClickCloseBtn()
     {
         _highScore.StopBurst();
-        gameObject.SetActive(false);
+        Close();
     }
 }

@@ -16,4 +16,6 @@ public class LegalUI : CloseBaseUI
     {
         Close();
     }
+
+    protected override void OnDestroyed() { }
 }

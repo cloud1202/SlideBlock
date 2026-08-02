@@ -56,4 +56,6 @@ public class PopupQuestionUI : CloseBaseUI, IPopupQuestion
     {
         Close();
     }
+
+    protected override void OnDestroyed() { }
 }

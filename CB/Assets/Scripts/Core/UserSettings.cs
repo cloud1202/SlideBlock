@@ -37,8 +37,7 @@ public class UserSettings : BaseManager
         {
             SetPref(SaveFieldType.HighScore_Classic, value);
             _user.ClassicScore = value;
-            _user.IsDirty = true;
-            m_firebase.SaveUser(_user);
+            Commit();
             m_firebase.ReportScore(value).Forget();
         }
     }
@@ -51,8 +50,7 @@ public class UserSettings : BaseManager
             SetPref(SaveFieldType.IsBGMOn, value ? 1 : 0);
             if (!value) m_telemetry.LogEvent("bgm_off");
             _user.IsBGMOn = value;
-            _user.IsDirty = true;
-            m_firebase.SaveUser(_user);
+            Commit();
         }
     }
 
@@ -64,8 +62,7 @@ public class UserSettings : BaseManager
             SetPref(SaveFieldType.IsSFXOn, value ? 1 : 0);
             if (!value) m_telemetry.LogEvent("sfx_off");
             _user.IsSFXOn = value;
-            _user.IsDirty = true;
-            m_firebase.SaveUser(_user);
+            Commit();
         }
     }
 
@@ -77,9 +74,20 @@ public class UserSettings : BaseManager
             SetPref(SaveFieldType.IsSymbolOn, value ? 1 : 0);
             if (value) m_telemetry.LogEvent("symbol_on");
             _user.IsSymbolOn = value;
-            _user.IsDirty = true;
-            m_firebase.SaveUser(_user);
+            Commit();
         }
+    }
+
+    /// <summary>
+    /// 변경 확정. 최종 플레이 시각을 갱신해 PlayerPrefs에 남기고 Firestore 저장을 요청한다.
+    /// 클라우드 저장이 차단된 상태여도 시각은 로컬에 남으므로, 다음 실행에서 원격 문서와
+    /// 비교해 이 세션의 변경이 더 최신이면 되살아난다.
+    /// </summary>
+    private void Commit()
+    {
+        _user.TouchLastPlayed();
+        _user.IsDirty = true;
+        m_firebase.SaveUser(_user);
     }
 
     private static void SetPref(SaveFieldType field, int value)

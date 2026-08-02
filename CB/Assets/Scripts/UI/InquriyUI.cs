@@ -47,4 +47,6 @@ public class InquriyUI : CloseBaseUI
         else
             _content.text = string.Empty;
     }
+
+    protected override void OnDestroyed() { }
 }

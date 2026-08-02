@@ -22,4 +22,6 @@ public class PopupNoticeUI : CloseBaseUI, IPopupNotice
         _content.text = m_textDataManager.GetGameText(content);
         _panel.sizeDelta = Utility.UpdateLayoutSize(_content, _minSize, _maxSize, _padding);
     }
+
+    protected override void OnDestroyed() { }
 }

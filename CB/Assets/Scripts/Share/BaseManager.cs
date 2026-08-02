@@ -1,5 +1,4 @@
 using Cysharp.Threading.Tasks;
-using VContainer;
 using VContainer.Unity;
 
 public class BaseManager : IInitializable

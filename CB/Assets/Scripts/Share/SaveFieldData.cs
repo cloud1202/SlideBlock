@@ -5,6 +5,7 @@ public static class SaveFieldData
         "HighScore_Classic",
         "IsBGMOn",
         "IsSFXOn",
-        "IsSymbolOn"
+        "IsSymbolOn",
+        "LastPlayed"
     };
 }

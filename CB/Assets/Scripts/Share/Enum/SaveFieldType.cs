@@ -5,4 +5,5 @@ public enum SaveFieldType
     IsBGMOn,
     IsSFXOn,
     IsSymbolOn,
+    LastPlayed,
 }
