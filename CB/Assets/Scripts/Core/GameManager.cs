@@ -1,5 +1,4 @@
 using Cysharp.Threading.Tasks;
-using System.Threading;
 using UnityEngine;
 using VContainer;
 using VContainer.Unity;
@@ -23,6 +22,8 @@ public class GameManager : BaseManager
         m_prefabManager = prefabManager;
         m_telemetry = telemetry;
         m_userSettings = userSettings;
+        Application.focusChanged += OnFocusChanged;
+        Application.quitting += OnQuitting;
         Bootstrap().Forget();
     }
 
@@ -129,9 +130,9 @@ public class GameManager : BaseManager
         Application.Quit();
     }
 
-    private void OnApplicationPause(bool pause)
+    private void OnFocusChanged(bool hasFocus)
     {
-        if (!pause)
+        if (hasFocus)
             return;
 
         PlayerPrefs.Save();
@@ -142,19 +143,11 @@ public class GameManager : BaseManager
         m_telemetry.Log("App paused");
     }
 
-    private void OnApplicationQuit()
+    private void OnQuitting()
     {
         PlayerPrefs.Save();
         m_telemetry.LogEvent("app_quit", "real_time", Time.realtimeSinceStartup.ToString());
-    }
-
-    public void Dispose()
-    {
-        throw new System.NotImplementedException();
-    }
-
-    public UniTask StartAsync(CancellationToken cancellation = default)
-    {
-        throw new System.NotImplementedException();
+        Application.focusChanged -= OnFocusChanged;
+        Application.quitting -= OnQuitting;
     }
 }
