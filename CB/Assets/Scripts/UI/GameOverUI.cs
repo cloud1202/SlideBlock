@@ -12,13 +12,15 @@ public class GameOverUI : BaseUI, IScore
     private GameManager m_gameManager;
     private PrefabManager m_prefabManager;
     private SoundManager m_soundManager;
+    private AdmobManager m_adMobManager;
 
     [Inject]
-    public void Construct(GameManager gameManager, PrefabManager prefabManager, SoundManager soundManager)
+    public void Construct(GameManager gameManager, PrefabManager prefabManager, SoundManager soundManager, AdmobManager adMobManager)
     {
         m_gameManager = gameManager;
         m_prefabManager = prefabManager;
         m_soundManager = soundManager;
+        m_adMobManager = adMobManager;
     }
     public override void Init()
     {
@@ -46,7 +48,7 @@ public class GameOverUI : BaseUI, IScore
         _highScore.Burst();
 
 #if UNITY_ANDROID || UNITY_EDITOR
-        AdmobManager.Instance.CreateInterstitial(2f).Forget();
+        m_adMobManager.CreateInterstitial(2f).Forget();
 #endif
     }
 

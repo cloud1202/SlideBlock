@@ -10,13 +10,15 @@ public class MenuUI : BaseUI
     private GameManager m_gameManager;
     private PrefabManager m_prefabManager;
     private SoundManager m_soundManager;
+    private InputManager m_inputManager;
 
     [Inject]
-    public void Construct(GameManager gameManager, PrefabManager prefabManager, SoundManager soundManager)
+    public void Construct(GameManager gameManager, PrefabManager prefabManager, SoundManager soundManager, InputManager inputManager)
     {
         m_gameManager = gameManager;
         m_prefabManager = prefabManager;
         m_soundManager = soundManager;
+        m_inputManager = inputManager;
     }
     private void Awake()
     {
@@ -31,7 +33,7 @@ public class MenuUI : BaseUI
 
     public override void Init()
     {
-        InputManager.Instance.UseInputHandler = false;
+        m_inputManager.UseInputHandler = false;
         InitLoadUI().Forget();
     }
 
@@ -69,6 +71,6 @@ public class MenuUI : BaseUI
     public void OnClickCloseBtn()
     {
         base.Close();
-        InputManager.Instance.UseInputHandler = true;
+        m_inputManager.UseInputHandler = true;
     }
 }

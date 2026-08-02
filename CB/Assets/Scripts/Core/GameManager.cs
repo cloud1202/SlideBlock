@@ -10,12 +10,13 @@ public class GameManager : BaseManager
     private FirebaseManager m_firebaseManager;
     private InputManager m_inputManger;
     private PrefabManager m_prefabManager;
-    [Inject]
-    public void Construct(FirebaseManager firebaseManager, InputManager inputManger, PrefabManager prefabManager)
+    public GameManager(ManagerInitTracker tracker, FirebaseManager firebaseManager, InputManager inputManger, PrefabManager prefabManager) : base(tracker)
     {
+        LLogger.Log("GameManager");
         m_firebaseManager = firebaseManager;
         m_inputManger = inputManger;
         m_prefabManager = prefabManager;
+        Bootstrap().Forget();
     }
 
     public int HighScore
@@ -53,8 +54,8 @@ public class GameManager : BaseManager
 
     async public UniTask Bootstrap()
     {
+        LLogger.Log("Bootstrap");
         ResolutionScreen.InitResolution();
-        m_inputManger.SubscribeToInputHandler(InputType.Game_Exit, OnClickExit);
         //await UniTask.WaitUntil(() => m_firebaseManager.IsInitialized);
         //m_firebaseManager.Log("AddressableManager Init");
         //await AddressableManager.Instance.SetAddressable();
@@ -68,14 +69,17 @@ public class GameManager : BaseManager
         //await PrefabManager.Instance.InitLoadObjects();
         //m_firebaseManager.Log("Force Update Check");
         //await m_firebaseManager.CheckForForceUpdateAsync();
-        await UniTask.WaitUntil(() => m_firebaseManager?.IsUpdate ?? false);
+       //await UniTask.WaitUntil(() => m_firebaseManager?.IsUpdate ?? false);
         await CheckedManagers(
             ManagerType.Addressable,
             ManagerType.Prefab,
             ManagerType.Sound,
             ManagerType.TextData,
-            ManagerType.Firebase);
+            ManagerType.Firebase,
+            ManagerType.Input
+            );
 
+        m_inputManger.SubscribeToInputHandler(InputType.Game_Exit, OnClickExit);
         CompleteInit(ManagerType.Game);
         _lobbyUI = await m_prefabManager.InstantiateStaticUI<IBaseUI>(PrefabData.LobbyUI);
         _loadingUI = await m_prefabManager.InstantiateStaticUI<IBaseUI>(PrefabData.LoadingUI);

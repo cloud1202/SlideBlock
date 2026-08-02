@@ -17,8 +17,7 @@ using UnityEngine;
 using UnityEngine.SocialPlatforms;
 using VContainer;
 
-[ManagerOrder(1)]
-public class FirebaseManager : SingletonInstance<FirebaseManager>, IManager
+public class FirebaseManager : BaseManager
 {
     public bool IsInitialized { get; private set; }
 #if UNITY_ANDROID || UNITY_EDITOR
@@ -111,11 +110,6 @@ public class FirebaseManager : SingletonInstance<FirebaseManager>, IManager
     }
 
 
-    public override void Init()
-    {
-        base.Init();
-        InitializeFirebase();
-    }
 
     #region Core Initialization
 
@@ -137,11 +131,13 @@ public class FirebaseManager : SingletonInstance<FirebaseManager>, IManager
             //InitMessaging();
             SignInAuth();
             IsInitialized = true;
+            CompleteInit(ManagerType.Firebase);
         });
 #else
         _user = new UserData();
         Logging("WebGL: PlayerPrefs 기반 로컬 데이터로 초기화");
         IsInitialized = true;
+        CompleteInit(ManagerType.Firebase);
 #endif
     }
 
@@ -538,11 +534,13 @@ public class FirebaseManager : SingletonInstance<FirebaseManager>, IManager
     private static string PLAY_STORE_URL => $"https://play.google.com/store/apps/details?id={Application.identifier}";
 
     private PrefabManager m_prefabManager;
-    [Inject]
-    public void Construct(PrefabManager prefabManager)
+
+    public FirebaseManager(ManagerInitTracker tracker, PrefabManager prefabManager) : base(tracker)
     {
         m_prefabManager = prefabManager;
+        InitializeFirebase();
     }
+
     public async UniTask CheckForForceUpdateAsync()
     {
 #if UNITY_ANDROID || UNITY_EDITOR

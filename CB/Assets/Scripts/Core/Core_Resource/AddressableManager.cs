@@ -4,14 +4,20 @@ using System.Threading;
 using UnityEngine;
 using UnityEngine.AddressableAssets;
 using UnityEngine.ResourceManagement.AsyncOperations;
+using VContainer;
+using VContainer.Unity;
 
 public class AddressableManager : BaseManager
 {
     private Dictionary<ContainLabel, List<AsyncOperationHandle>> _loadHandles = new Dictionary<ContainLabel, List<AsyncOperationHandle>>();
     private List<GameObject> _instantiateHandles = new List<GameObject>();
 
-    public AddressableManager()
+
+    private readonly IObjectResolver m_resolver;
+    public AddressableManager(ManagerInitTracker tracker, IObjectResolver resolver) : base(tracker)
     {
+        m_resolver = resolver;
+        LLogger.Log("AddressableManager");
         SetAddressable().Forget();
     }
     public async UniTask SetAddressable()
@@ -164,6 +170,7 @@ public class AddressableManager : BaseManager
         //await Load<GameObject>(assetRef);
 
         var go = await assetResource.InstantiateAsync<GameObject>(parent);
+        m_resolver.InjectGameObject(go);
         var obj = go.AddComponent<InstantiateObject>();
         if (isProtected == false)
             _instantiateHandles.Add(go);

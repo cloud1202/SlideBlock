@@ -43,27 +43,26 @@ public class Board : RoundObject
     private GameManager m_gameManager;
     private PrefabManager m_prefabManager;
     private SoundManager m_soundManager;
+    private InputManager m_inputManager;
 
     [Inject]
-    public void Construct(GameManager gameManager, PrefabManager prefabManager, SoundManager soundManager)
+    public void Construct(GameManager gameManager, PrefabManager prefabManager, SoundManager soundManager, InputManager inputManager)
     {
         m_gameManager = gameManager;
         m_prefabManager = prefabManager;
         m_soundManager = soundManager;
-    }
-    private void Awake()
-    {
-        InputManager.Instance.SubscribeToInputHandler(InputType.Player_Touch, OnTouchPoint, cancel: OnEndTouchPoint);
-        InputManager.Instance.SubscribeToInputHandler(InputType.Player_Point, perform: OnDragPoint);
+        m_inputManager = inputManager;
+
+        m_inputManager.SubscribeToInputHandler(InputType.Player_Touch, OnTouchPoint, cancel: OnEndTouchPoint);
+        m_inputManager.SubscribeToInputHandler(InputType.Player_Point, perform: OnDragPoint);
 
         _bricks.Clear();
     }
-
     private void OnDestroy()
     {
         ResetToken();
-        InputManager.Instance.UnsubscribeToInputHandler(InputType.Player_Touch, OnTouchPoint, cancel: OnEndTouchPoint);
-        InputManager.Instance.UnsubscribeToInputHandler(InputType.Player_Point, perform: OnDragPoint);
+        m_inputManager.UnsubscribeToInputHandler(InputType.Player_Touch, OnTouchPoint, cancel: OnEndTouchPoint);
+        m_inputManager.UnsubscribeToInputHandler(InputType.Player_Point, perform: OnDragPoint);
     }
 
     public override void Init()
@@ -150,7 +149,6 @@ public class Board : RoundObject
         }
         var pos = context.ReadValue<Vector2>();
 
-        LLogger.Log($"Drag Begin Pos :: {_beginPos.ToString()}");
         var dir = (pos - _beginPos);
         if (dir.magnitude <= TOUCH_LENGTH)
             return;

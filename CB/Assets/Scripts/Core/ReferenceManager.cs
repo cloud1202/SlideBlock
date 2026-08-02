@@ -10,10 +10,12 @@ public class ReferenceManager<T> : BaseManager
     protected IEnumerable<IAssetResource> _assetDatas = new List<IAssetResource>();
 
     protected AddressableManager m_addressableManager;
-    [Inject]
-    public void Construct(AddressableManager addressablemanager)
+
+    public ReferenceManager(ManagerInitTracker tracker, AddressableManager addressablemanager) : base(tracker)
     {
+        LLogger.Log("ReferenceManager");
         m_addressableManager = addressablemanager;
+        Init().Forget();
     }
 
     async protected virtual UniTask Init()

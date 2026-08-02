@@ -6,6 +6,12 @@ public class PrefabManager : ReferenceManager<PrefabManager>
     private ISafeAreaFitter _staticCanvas;
     private ISafeAreaFitter _dynamicCanvas;
     private Camera _mainCamera;
+
+    public PrefabManager(ManagerInitTracker tracker, AddressableManager addressablemanager) : base(tracker, addressablemanager)
+    {
+        LLogger.Log("PrefabManager");
+    }
+
     public RectTransform MainCanvas => _staticCanvas.MyRT;
     public Camera MainCamera => _mainCamera;
 
@@ -13,6 +19,7 @@ public class PrefabManager : ReferenceManager<PrefabManager>
     {
         await base.Init();
         await LoadAssetReference();
+        await InitLoadObjects();
         CompleteInit(ManagerType.Prefab);
     }
 
@@ -25,7 +32,7 @@ public class PrefabManager : ReferenceManager<PrefabManager>
 
     async public UniTask InitLoadObjects()
     {
-        //_mainCamera = await InstantiateObject<Camera>(PrefabData.MainCamera, GameManager.Instance.transform, true);
+        _mainCamera = await InstantiateObject<Camera>(PrefabData.MainCamera, null, true);
         _staticCanvas = await InstantiateObject<ISafeAreaFitter>(PrefabData.StaticCanvas, null, true);
         _dynamicCanvas = await InstantiateObject<ISafeAreaFitter>(PrefabData.DynamicCanvas, null, true);
         _staticCanvas.InitSafeArea();

@@ -4,32 +4,33 @@ using GoogleMobileAds.Ump.Api;
 using System.Collections.Generic;
 
 #if UNITY_ANDROID || UNITY_EDITOR
-[ManagerOrder(2)]
-public class AdmobManager : SingletonInstance<AdmobManager>, IManager
+public class AdmobManager : BaseManager
 {
     public bool IsPrivacyOptionsRequire = ConsentInformation.PrivacyOptionsRequirementStatus == PrivacyOptionsRequirementStatus.Required;
 
     private BannerView bannerView;
-    public override void Init()
+    private FirebaseManager m_firebaseManager;
+    public AdmobManager(ManagerInitTracker tracker, FirebaseManager firebaseManager) : base(tracker)
     {
-        base.Init();
         Logging("Admob 초기화");
-
+        m_firebaseManager = firebaseManager;
         RequestConsent();
     }
+
 
     private void InitializeAndLoadAds()
     {
         MobileAds.Initialize(initStatus =>
         {
             Logging("Admob 초기화 완료");
+            CompleteInit(ManagerType.Admob);
             CreateBanner();
         });
     }
 
     private void CreateBanner()
     {
-        FirebaseManager.Instance.Log("Bottom Admob Banner Create");
+        m_firebaseManager.Log("Bottom Admob Banner Create");
 #if UNITY_EDITOR
         string adUnitId = "ca-app-pub-3940256099942544/6300978111";
 
@@ -45,7 +46,7 @@ public class AdmobManager : SingletonInstance<AdmobManager>, IManager
 
     async public UniTask CreateInterstitial(float delay = 0f)
     {
-        FirebaseManager.Instance.Log("Update High Score Admob Create");
+        m_firebaseManager.Log("Update High Score Admob Create");
         await UniTask.WaitForSeconds(delay);
         var adRequest = new AdRequest();
 #if UNITY_EDITOR

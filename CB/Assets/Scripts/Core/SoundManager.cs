@@ -45,6 +45,13 @@ public class SoundManager : ReferenceManager<SoundManager>
     }
 
     private float _sfxVolumPer;
+    private FirebaseManager m_firebaseManager;
+    public SoundManager(ManagerInitTracker tracker, AddressableManager addressablemanager, FirebaseManager firebaseManager) : base(tracker, addressablemanager)
+    {
+        LLogger.Log("SoundManager");
+        m_firebaseManager = firebaseManager;
+    }
+
     public float SFXVolumPer
     {
         get { return _sfxVolumPer; }
@@ -60,26 +67,26 @@ public class SoundManager : ReferenceManager<SoundManager>
 
     public bool IsBGMOn
     {
-        get { return FirebaseManager.Instance.IsBGMOn; }
+        get { return m_firebaseManager.IsBGMOn; }
         set
         {
-            if (FirebaseManager.Instance.IsBGMOn == value)
+            if (m_firebaseManager.IsBGMOn == value)
                 return;
 
-            FirebaseManager.Instance.IsBGMOn = value;
+            m_firebaseManager.IsBGMOn = value;
             _bgmAudio.mute = !value;
         }
     }
 
     public bool IsSFXOn
     {
-        get { return FirebaseManager.Instance.IsSFXOn; }
+        get { return m_firebaseManager.IsSFXOn; }
         set
         {
-            if (FirebaseManager.Instance.IsSFXOn == value)
+            if (m_firebaseManager.IsSFXOn == value)
                 return;
 
-            FirebaseManager.Instance.IsSFXOn = value;
+            m_firebaseManager.IsSFXOn = value;
             _sfxAudio.mute = !value;
         }
     }
@@ -101,9 +108,9 @@ public class SoundManager : ReferenceManager<SoundManager>
 
     async private UniTask LoadSaveFieldData()
     {
-        await UniTask.WaitUntil(() => FirebaseManager.Instance.IsLoadData);
-        _bgmAudio.mute = !FirebaseManager.Instance.IsBGMOn;
-        _sfxAudio.mute = !FirebaseManager.Instance.IsSFXOn;
+        await UniTask.WaitUntil(() => m_firebaseManager.IsLoadData);
+        _bgmAudio.mute = !m_firebaseManager.IsBGMOn;
+        _sfxAudio.mute = !m_firebaseManager.IsSFXOn;
     }
 
     async public override UniTask LoadAssetReference()
@@ -171,12 +178,18 @@ public class SoundManager : ReferenceManager<SoundManager>
         _sfxAudio.PlayOneShot(clip);
     }
 
+    public Tween FadeSound(AudioSource audio, float value, float duration)
+    {
+        return DOTween.To(() => audio.volume, vol => audio.volume = vol, value, duration);
+    }
+
     async private UniTask FadeBGM(bool isFadeOut)
     {
         if (_bgmAudio.clip == null)
             return;
+
         float endValue = isFadeOut ? 0f : 1f;
-        var tween = DOTween.To(() => _bgmAudio.volume, vol => _bgmAudio.volume = vol, endValue, 0.5f);
+        var tween = FadeSound(_bgmAudio, endValue, 0.5f);
 
         await UniTask.WaitWhile(() => tween.active);
     }

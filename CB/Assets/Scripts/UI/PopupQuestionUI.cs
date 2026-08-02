@@ -15,20 +15,22 @@ public class PopupQuestionUI : BaseUI, IPopupQuestion
     private Action _onClickNo;
 
     protected TextDataManager m_textDataManager;
+    protected InputManager m_inputManager;
     [Inject]
-    public void Construct(TextDataManager textDataManager)
+    public void Construct(TextDataManager textDataManager, InputManager inputManager)
     {
         m_textDataManager = textDataManager;
+		m_inputManager = inputManager;
     }
     public override void Init()
     {
-        InputManager.Instance.SubscribeToInputHandler(InputType.Game_Exit, OnClickBackKey);
+        m_inputManager.SubscribeToInputHandler(InputType.Game_Exit, OnClickBackKey);
         base.Init();
     }
 
     public override void Close()
     {
-        InputManager.Instance.UnsubscribeToInputHandler(InputType.Game_Exit, OnClickBackKey);
+        m_inputManager.UnsubscribeToInputHandler(InputType.Game_Exit, OnClickBackKey);
         base.Close();
         Destroy(this.gameObject);
     }

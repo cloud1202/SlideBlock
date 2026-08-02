@@ -11,12 +11,14 @@ public class TextDataManager : BaseManager
     protected Dictionary<int, GameText> _gameTextMap = new Dictionary<int, GameText>();
 
     private AddressableManager m_addressableManager;
-    [Inject]
-    public void Construct(AddressableManager addressableManager)
+    private GameManager m_gameManager;
+
+    public TextDataManager(ManagerInitTracker tracker, AddressableManager addressableManager, GameManager gameManager) : base(tracker)
     {
+        LLogger.Log("TextDataManager");
         m_addressableManager = addressableManager;
+        m_gameManager = gameManager;
         LoadAssetReference().Forget();
-        CompleteInit(ManagerType.TextData);
     }
 
 
@@ -35,6 +37,7 @@ public class TextDataManager : BaseManager
                 _gameTextMap.Add(text.Index, text);
             }
         }
+        CompleteInit(ManagerType.TextData);
     }
 
     public string GetGameText(GameTextData data)
@@ -45,7 +48,6 @@ public class TextDataManager : BaseManager
             LLogger.Log($"Not Found Game Text : {data}");
             return string.Empty;
         }
-        //return gt.text[EnumConverter.Enum32ToInt(GameManager.Instance.Language)];
-        return "";
+        return gt.text[EnumConverter.Enum32ToInt(m_gameManager.Language)];
     }
 }

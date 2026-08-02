@@ -14,18 +14,18 @@ public class SoundEmitter : MonoBehaviour
     public void Construct(SoundManager soundManager)
     {
         m_soundManager = soundManager;
+        SetAudioClip().Forget();
+        m_soundManager.SubscribeToSoundHandler(UpdateVolum);
     }
     private void Awake()
     {
         _audioSource = GetComponent<AudioSource>();
         _initVolum = _audioSource.volume;
-        SetAudioClip().Forget();
-        m_soundManager.SubscribeToSoundHandler(UpdateVolum);
     }
 
     async private UniTask SetAudioClip()
     {
-        //_audioSource.clip = await SoundManager.Instance.LoadAudioClip(_soundType);
+        _audioSource.clip = await m_soundManager.LoadAsset<AudioClip>(EnumConverter.Enum32ToInt(_soundType));
     }
 
     private void OnDestroy()
@@ -45,6 +45,6 @@ public class SoundEmitter : MonoBehaviour
 
     public void FadeSound(float value, float duration)
     {
-        //SoundManager.Instance.FadeSound(_audioSource, value, duration);
+        m_soundManager.FadeSound(_audioSource, value, duration);
     }
 }

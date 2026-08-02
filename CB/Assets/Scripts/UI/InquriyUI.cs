@@ -11,13 +11,15 @@ public class InquriyUI : BaseUI
     private GameManager m_gameManager;
     private PrefabManager m_prefabManager;
     private SoundManager m_soundManager;
+    private FirebaseManager m_firebaseManager;
 
     [Inject]
-    public void Construct(GameManager gameManager, PrefabManager prefabManager, SoundManager soundManager)
+    public void Construct(GameManager gameManager, PrefabManager prefabManager, SoundManager soundManager, FirebaseManager firebaseManager)
     {
         m_gameManager = gameManager;
         m_prefabManager = prefabManager;
         m_soundManager = soundManager;
+        m_firebaseManager = firebaseManager;
     }
     public override void Init()
     {
@@ -37,7 +39,7 @@ public class InquriyUI : BaseUI
 
     async private UniTask SendInquiry()
     {
-        var ret = await FirebaseManager.Instance.SendInquiryAsync(_content.text, _email.text);
+        var ret = await m_firebaseManager.SendInquiryAsync(_content.text, _email.text);
 
         var popup = await m_prefabManager.InstantiateDynamicUI<IPopupNotice>(PrefabData.PopupNoticeUI);
 

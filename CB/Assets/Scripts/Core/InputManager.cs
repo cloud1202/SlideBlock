@@ -2,10 +2,16 @@ using System;
 using UnityEngine.InputSystem;
 using static UnityEngine.InputSystem.InputAction;
 
-[ManagerOrder(3)]
-public class InputManager : SingletonInstance<InputManager>, IManager
+public class InputManager : BaseManager
 {
     private PlayerInput _inputHandler;
+
+    public InputManager(ManagerInitTracker tracker) : base(tracker)
+    {
+        _inputHandler = new PlayerInput();
+        UseInputHandler = true;
+        CompleteInit(ManagerType.Input);
+    }
 
     public bool UseInputHandler
     {
@@ -16,12 +22,6 @@ public class InputManager : SingletonInstance<InputManager>, IManager
             else
                 _inputHandler.Player.Disable();
         }
-    }
-    public override void Init()
-    {
-        base.Init();
-        _inputHandler = new PlayerInput();
-        UseInputHandler = true;
     }
 
 

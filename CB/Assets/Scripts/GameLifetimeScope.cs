@@ -5,6 +5,8 @@ public class GameLifetimeScope : LifetimeScope
 {
     protected override void Configure(IContainerBuilder builder)
     {
+        LLogger.Log("GameLifetimeScope");
+        builder.RegisterEntryPoint<ManagerInitTracker>(Lifetime.Singleton).AsSelf();
         builder.RegisterEntryPoint<AddressableManager>(Lifetime.Singleton).AsSelf();
         builder.RegisterEntryPoint<FirebaseManager>(Lifetime.Singleton).AsSelf();
         builder.RegisterEntryPoint<AdmobManager>(Lifetime.Singleton).AsSelf();
@@ -13,5 +15,6 @@ public class GameLifetimeScope : LifetimeScope
         builder.RegisterEntryPoint<SoundManager>(Lifetime.Singleton).AsSelf();
         builder.RegisterEntryPoint<TextDataManager>(Lifetime.Singleton).AsSelf();
         builder.RegisterEntryPoint<GameManager>(Lifetime.Singleton).AsSelf();
+        LLogger.Log("GameLifetimeScope End");
     }
 }
