@@ -36,7 +36,25 @@ Unity는 `Packages/`를 `Assets/`보다 먼저 컴파일한다. 따라서 UPM �
 | | DOTween (`Assets/Plugins/Demigiant`) |
 
 이 제약이 패키지 범위를 결정한다. `FirebaseManager`, `TelemetryManager` 구현체, `UserSettings`,
-`AdmobManager`, 그리고 DOTween으로 페이드하는 `SoundManager`는 패키지에 들어갈 수 없다.
+`AdmobManager`는 패키지에 들어갈 수 없다.
+
+### DOTween은 의존하지 않고 걷어낸다
+
+DOTween은 무료판이므로 OpenUPM(`com.demigiant.dotween`)으로 전환하면 패키지가 참조할 수도
+있다. 그러나 **의존하지 않는 쪽을 택한다.**
+
+패키지 후보 코드에서 DOTween 사용처는 세 곳뿐이고 전부 단순 보간이다 — `SoundManager`의 볼륨
+페이드, `Utility`의 토스트 애니메이션, `SlideToggle`의 핸들 이동. 특히 `SlideToggle`은 **이미
+DOTween 없이 같은 곡선을 구현해 두었다.** 에디터 프리뷰용으로 OutCubic을 손으로 계산한다
+(`1f - Mathf.Pow(1f - t, 3f)`). 런타임은 DOTween, 에디터는 수동으로 같은 커브가 두 번 구현된
+상태다.
+
+`Utility`에 UniTask 기반 보간 헬퍼를 두고 세 곳을 그것으로 통일한다. 얻는 것:
+
+- 패키지의 서드파티 런타임 의존이 **0**이 된다. 새 프로젝트에서 OpenUPM scoped registry를
+  등록할 필요가 없다 — 스타트팩 목적에 정확히 부합한다
+- `SoundManager`를 패키지에 넣을 수 있게 된다. 제외했던 유일한 이유가 DOTween이었다
+- `SlideToggle`의 중복 구현이 사라진다
 
 ## 패키지 구성
 
@@ -74,11 +92,14 @@ Color-Brick의 `Share` 어셈블리는 유지하지 않는다. 그 안에서 패
 
 | 어셈블리 | 내용 | 외부 의존 |
 |---|---|---|
-| Utility | `LLogger`, `Colors`, `EnumConverter`, `Timer`, `ResolutionScreen`, `VibrateData` | UniTask |
+| Utility | `LLogger`, `Colors`, `EnumConverter`, `Timer`, `ResolutionScreen`, `VibrateData`, `Tweening`(보간 헬퍼), 토스트 애니메이션 | UniTask |
 | Core | `BaseManager`, `ManagerInitTracker`, `ITelemetry`, `ConsoleTelemetry`, `PlayerPrefsStore` | VContainer, UniTask |
-| Resource | `AddressableManager`, `AssetReferenceBase`, `ReferenceManager`, `PrefabManagerBase`, `TextDataManagerBase`, `GameTextTableBase`, `InstantiateObject`, `IAssetResource` | Addressables |
+| Resource | `AddressableManager`, `AssetReferenceBase`, `ReferenceManager`, `PrefabManagerBase`, `SoundManagerBase`, `TextDataManagerBase`, `GameTextTableBase`, `InstantiateObject`, `IAssetResource` | Addressables |
 | Input | `InputManager` | InputSystem |
-| UI | `BaseUI`, `CloseBaseUI`, `SafeAreaFitter` | ugui / TextMeshPro |
+| UI | `BaseUI`, `CloseBaseUI`, `SafeAreaFitter`, `SlideToggle` | ugui / TextMeshPro |
+
+`SlideToggle`은 `ToolKit/Component/`에 있던 재사용 UI 컴포넌트다. 같은 `ToolKit/SDK/BrickColorEditor/`는
+Color-Brick 전용이라 제외한다.
 
 ## 런타임 설계
 
@@ -179,6 +200,35 @@ public sealed class ConsoleTelemetry : ITelemetry { /* LLogger로 출력 */ }
 `AdmobManager`는 통째로 프로젝트에 둔다. 호출부가 배너 하나, 전면광고 하나뿐이라 인터페이스를
 두는 것은 과하다.
 
+### 사운드 — 설정 의존을 뒤집는다
+
+`SoundManagerBase`를 패키지에 넣으려면 하나 더 정리해야 한다. 현재 `SoundManager`는
+`m_userSettings.IsBGMOn`을 직접 읽는데 `UserSettings`는 프로젝트 소유다.
+
+패키지 베이스는 음소거 상태를 **자기 필드로** 갖고, 영속화는 프로젝트 하위 클래스가 맡는다.
+
+```csharp
+// 패키지
+public abstract class SoundManagerBase<TKey, TLabel> : ReferenceManager<TKey, TLabel>
+{
+    public bool BgmMuted { get; set; }        // 세터가 AudioSource.mute까지 반영
+    public bool SfxMuted { get; set; }
+
+    public UniTask PlayBgm(TKey key);
+    public UniTask PlaySfx(TKey key, CancellationToken ct = default);
+    protected UniTask FadeAsync(AudioSource src, float target, float duration);  // Tweening 헬퍼 사용
+}
+
+// 프로젝트
+public class SoundManager : SoundManagerBase<SoundData, ContainLabel>
+{
+    // UserSettings와 양방향 동기화
+}
+```
+
+이 방향이면 패키지가 오디오 소스 생성·볼륨·페이드·재생이라는 기계적인 부분을 전부 갖고,
+프로젝트는 "이 값을 어디에 저장하는가"만 결정한다.
+
 ### 텍스트 테이블의 언어 선택
 
 `GameTextTableBase<TKey>`의 각 항목은 `string[] text`를 갖고 언어 인덱스로 접근한다. 언어 enum
@@ -269,20 +319,18 @@ Color-Brick의 Editor 스크립트 8개 중 `ChangeMaterial`을 제외한 7개�
 
 1. `manifest.json`에 git URL 추가 (UniTask·VContainer·Addressables·InputSystem은 패키지 의존성으로 함께 해결)
 2. enum 정의: `PrefabData`, `ContainLabel`, `SoundData`, `GameTextData`, `SaveFieldType`, `LanguageType`
-3. 얇은 구체 클래스: `PrefabAssetReference`, `SoundAssetReference`, `PrefabManager`, `GameTextTable`, `TextDataManager`
+3. 얇은 구체 클래스: `PrefabAssetReference`, `SoundAssetReference`, `PrefabManager`, `SoundManager`, `GameTextTable`, `TextDataManager`
 4. `GameLifetimeScope` 작성 — 매니저 등록
 5. SO 에셋 생성 + Addressable 등록
 
 2~4단계는 뼈대 생성 명령이 대신한다. 생성되는 것은 **컴파일되는 스텁**이며, 게임에 맞는 값은
 직접 채운다.
 
-`SoundManager`는 여기 포함되지 않는다. 얇은 상속으로 끝나지 않고 오디오 소스 생성·볼륨·페이드
-같은 실제 구현이 필요하며, 페이드에 쓰는 DOTween은 패키지가 참조할 수 없다. 패키지는
-`ReferenceManager` 베이스까지만 제공하고, 프로젝트가 그 위에 작성한다.
+`SoundManager`는 상속 후 음소거 상태를 자기 저장소와 동기화하는 부분만 채우면 된다. 오디오
+소스 생성·볼륨·페이드·재생은 `SoundManagerBase`가 갖는다.
 
 ## 범위 밖
 
-- `SoundManager` 구현 — DOTween 의존. 베이스만 제공
 - Firebase 일체 — `FirebaseManager`, `ITelemetry` 구현체, `UserData`, `UserSettings`, 병합 로직
 - `AdmobManager`
 - `GameManager` — 게임 흐름
