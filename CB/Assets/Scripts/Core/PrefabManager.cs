@@ -39,9 +39,6 @@ public class PrefabManager : ReferenceManager<PrefabManager>, IManager
         if (_assetMap.TryGetValue(EnumConverter.Enum32ToInt(type), out var obj) == false)
             return false;
 
-        if (obj.instance == null)
-            return false;
-
         instance = obj.instance.GetComponent<TI>();
         return instance != null;
     }
