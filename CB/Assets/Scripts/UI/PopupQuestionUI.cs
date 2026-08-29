@@ -1,6 +1,7 @@
 using System;
 using TMPro;
 using UnityEngine;
+using UnityEngine.InputSystem;
 
 public class PopupQuestionUI : BaseUI, IPopupQuestion
 {
@@ -12,6 +13,18 @@ public class PopupQuestionUI : BaseUI, IPopupQuestion
     private Action _onClickYes;
     private Action _onClickNo;
 
+    public override void Init()
+    {
+        InputManager.Instance.SubscribeToInputHandler(InputType.Game_Exit, OnClickBackKey);
+        base.Init();
+    }
+
+    public override void Close()
+    {
+        InputManager.Instance.UnsubscribeToInputHandler(InputType.Game_Exit, OnClickBackKey);
+        base.Close();
+    }
+
     public void SetNoticeContent(GameTextData content)
     {
         _content.text = TextDataManager.Instance.GetGameText(content);
@@ -22,21 +35,26 @@ public class PopupQuestionUI : BaseUI, IPopupQuestion
     {
         _onClickYes = onClickYesAction;
         _onClickNo = onClickNoAction;
-        base.Init();
+        Init();
+    }
+
+    private void OnClickBackKey(InputAction.CallbackContext callback)
+    {
+        OnClickCloseBtn();
     }
 
     public void OnClickCloseBtn()
     {
-        base.Close();
+        _onClickNo?.Invoke();
+        Close();
     }
     public void OnClickYesBtn()
     {
         _onClickYes?.Invoke();
-        OnClickCloseBtn();
+        Close();
     }
     public void OnClickNoBtn()
     {
-        _onClickNo?.Invoke();
         OnClickCloseBtn();
     }
 }

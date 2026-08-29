@@ -34,7 +34,7 @@ public class Brick : MonoBehaviour
 
     public void SetSymbolState()
     {
-        _symbol.gameObject.SetActive(GameManager.Instance.IsSymbolOn);
+        //_symbol.gameObject.SetActive(GameManager.Instance.IsSymbolOn);
     }
 
 

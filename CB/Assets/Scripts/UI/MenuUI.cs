@@ -26,7 +26,7 @@ public class MenuUI : BaseUI
     async private UniTask InitLoadUI()
     {
         if (_inquriyUI == null)
-            _inquriyUI = await PrefabManager.Instance.InstantiateDynamicUI<IBaseUI>(PrefabData.InquriyUI, this.transform);
+            _inquriyUI = await PrefabManager.Instance.InstantiateDynamicUI<IBaseUI>(PrefabData.InquiryUI, this.transform);
 
         base.Init();
     }
@@ -44,7 +44,6 @@ public class MenuUI : BaseUI
 
     public void OnClickRetryBtn()
     {
-        GameManager.Instance.StartRound().Forget();
         OnClickCloseBtn();
     }
 

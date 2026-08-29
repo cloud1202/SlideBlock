@@ -45,6 +45,12 @@ public class GameLobbyUI : BaseUI
     }
 
 
+    public void OnCLickLeaderboard()
+    {
+        FirebaseManager.Instance.ShowLeaderboardUI().Forget();
+    }
+
+
     public void OnClickClassicBtn()
     {
         GameManager.Instance.StartRound().Forget();

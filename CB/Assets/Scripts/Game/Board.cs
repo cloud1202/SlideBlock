@@ -103,16 +103,13 @@ public class Board : RoundObject
         }
     }
 
-    private bool TrySpawnBrick()
+    private void SpawnBrick(List<BoardArea> areas)
     {
-        var areas = GetEmptyAreas();
         int cnt = areas.Count;
         for (int i = 0; i < cnt; ++i)
         {
             SpawnBrick(areas[i]);
         }
-
-        return cnt > 0;
     }
      
     private void SpawnBrick(BoardArea area)
@@ -157,7 +154,7 @@ public class Board : RoundObject
             _boardDirection = dir.y < 0 ? BoardDirection.Down : BoardDirection.Up;
         }
 
-        ChangeBoardDirection(_changeDirectionToken.Token).Forget();
+        ChangeBoardDirection().Forget();
     }
 
     private void OnEndTouchPoint(CallbackContext context)
@@ -165,47 +162,48 @@ public class Board : RoundObject
         _isDrag = false;
     }
 
-    async private UniTask ChangeBoardDirection(CancellationToken ct)
+    async private UniTask ChangeBoardDirection()
     {
         _isSlide = true;
-        bool anyDestroyed = false;
+        bool isMove = SlideAll();
+        if (isMove) await SlideBrick();
 
-        do
-        {
-            SlideAll();
-            await UniTask.WaitForSeconds(0.2f, cancellationToken: ct);
-            anyDestroyed = await DestroyMatches(ct);
-        }
-        while (anyDestroyed);
+        var areas = GetEmptyAreas();
 
-        bool isCompleteSpawn = TrySpawnBrick();
-
-        if (isCompleteSpawn == false)
+        if (areas.Count == 0)
         {
             ResetToken();
             ResetBoard();
             _roundManager.EndRound();
             return;
         }
-        await DestroyMatches(ct);
+
+        if (isMove)
+        {
+            SpawnBrick(areas);
+            await DestroyMatches(areas);
+        } 
 
         _isSlide = false;
     }
 
-    private void SlideAll()
+    private bool SlideAll()
     {
+        bool isMove = false;
         for (int lineIndex = 0; lineIndex < BOARD_SIZE; ++lineIndex)
         {
-            var (startRow, startCol, dRow, dCol, count) = GetLineConfig(lineIndex);
-            SlideOneLine(startRow, startCol, dRow, dCol, count);
+            var (startRow, startCol, dRow, dCol) = GetLineConfig(lineIndex);
+            isMove |= SlideOneLine(startRow, startCol, dRow, dCol);
         }
+        return isMove;
     }
 
-    private void SlideOneLine(int startRow, int startCol, int dRow, int dCol, int count)
+    private bool SlideOneLine(int startRow, int startCol, int dRow, int dCol)
     {
+        bool isMove = false;
         int writeR = startRow, writeC = startCol;
 
-        for (int i = 0; i < count; ++i)
+        for (int i = 0; i < BOARD_SIZE; ++i)
         {
             int readR = startRow + dRow * i;
             int readC = startCol + dCol * i;
@@ -214,6 +212,7 @@ public class Board : RoundObject
 
             if (readR != writeR || readC != writeC)
             {
+                isMove = true;
                 Brick brick = _boardAreas[readR, readC].brick;
                 brick.Move(_boardAreas[writeR, writeC].GetPos());
                 _boardAreas[writeR, writeC].SetBrick(brick);
@@ -223,54 +222,47 @@ public class Board : RoundObject
             writeR += dRow;
             writeC += dCol;
         }
+
+        return isMove;
     }
 
-    private (int startRow, int startCol, int dRow, int dCol, int lineCount)
+    private (int startRow, int startCol, int dRow, int dCol)
         GetLineConfig(int lineIndex) => _boardDirection switch
         {
-            BoardDirection.Up       => (BOARD_SIZE - 1, lineIndex, offset[0].r, offset[0].c, BOARD_SIZE),
-            BoardDirection.Right    => (lineIndex, BOARD_SIZE - 1, offset[1].r, offset[1].c, BOARD_SIZE),
-            BoardDirection.Down     => (0, lineIndex, offset[2].r, offset[2].c, BOARD_SIZE),
-            BoardDirection.Left     => (lineIndex, 0, offset[3].r, offset[3].c, BOARD_SIZE),
+            BoardDirection.Up       => (BOARD_SIZE - 1, lineIndex, offset[0].r, offset[0].c),
+            BoardDirection.Right    => (lineIndex, BOARD_SIZE - 1, offset[1].r, offset[1].c),
+            BoardDirection.Down     => (0, lineIndex, offset[2].r, offset[2].c),
+            BoardDirection.Left     => (lineIndex, 0, offset[3].r, offset[3].c),
             _ => throw new ArgumentException()
         };
 
-    async private UniTask<bool> DestroyMatches(CancellationToken ct)
+    async private UniTask SlideBrick()
     {
-        List<List<Brick>> toDestroyBricks = new List<List<Brick>>();
-        for(int i = 0; i < BOARD_SIZE; ++i)
+        bool anyDestroyed = false;
+        await SoundManager.Instance.PlaySFX(SoundData.Slide);
+
+        do
         {
-            for (int j = 0; j < BOARD_SIZE; ++j)
-            {
-                if (_boardAreas[i, j].isEmpty)
-                    continue;
-                var bricks = new List<Brick>();
-                DFSMatchBrick(i, j, ref bricks);
-                if (bricks.Count < MATCH_COUNT)
-                    continue;
-
-                toDestroyBricks.Add(bricks);
-            }
+            await UniTask.WaitForSeconds(0.2f, cancellationToken: _changeDirectionToken.Token);
+            anyDestroyed = await DestroyMatches();
+            if (anyDestroyed) SlideAll();
         }
+        while (anyDestroyed);
+    }
 
-        for (int i = 0; i < toDestroyBricks.Count; ++i)
-        {
-            int score = toDestroyBricks[i].Count * 10;
-            Bounds bounds = new Bounds(toDestroyBricks[i][0].transform.position, Vector3.zero);
-            toDestroyBricks[i].ForEach(b =>
-            {
-                b.Destroy();
-                _bricks.Enqueue(b);
-                bounds.Encapsulate(b.transform.position);
-            });
-            _roundManager.DestroyMatchBricks(score, bounds.center);
-        }
+    async private UniTask<bool> DestroyMatches(List<BoardArea> checkArea = null)
+    {
+        int destroyMatchGroupCnt = 0;
+        if (checkArea == null)
+            destroyMatchGroupCnt = CheckDestroyMatchGroupForAll();
+        else
+            destroyMatchGroupCnt = CheckDestroyMatchGroupForSection(checkArea);
 
-
-        if (toDestroyBricks.Count > 0)
+        // 사운드 재생
+        if (destroyMatchGroupCnt > 0)
         {
             await SoundManager.Instance.PlaySFX(SoundData.Match);
-            await UniTask.WaitForSeconds(0.4f, cancellationToken: ct);
+            await UniTask.WaitForSeconds(0.4f, cancellationToken: _changeDirectionToken.Token);
             return true;
         }
         else
@@ -280,33 +272,87 @@ public class Board : RoundObject
         }
     }
 
-    private void DFSMatchBrick(int row, int col, ref List<Brick> bricks)
+    private int CheckDestroyMatchGroupForAll()
     {
-        Brick brick = _boardAreas[row, col].brick;
-        _boardAreas[row, col].SetBrick();
-        bricks.Add(brick);
-        for (int i = 0; i < 4; ++i)
+        int cnt = 0;
+        bool[,] visited = new bool[BOARD_SIZE, BOARD_SIZE];
+        for (int row = 0; row < BOARD_SIZE; ++row)
         {
-            int checkR = row + offset[i].r;
-            int checkC = col + offset[i].c;
-
-            if (checkR < 0 || checkC < 0 || checkR >= BOARD_SIZE || checkC >= BOARD_SIZE)
-                continue;
-
-            if (_boardAreas[checkR, checkC].isEmpty)
-                continue;
-
-            if (_boardAreas[checkR, checkC].MatchBrickType(brick) == false)
-                continue;
-
-            DFSMatchBrick(checkR, checkC, ref bricks);
-
+            for (int col = 0; col < BOARD_SIZE; ++col)
+            {
+                if (DestroyMatchGroup(row, col, visited))
+                    cnt++;
+            }
         }
-        if (bricks.Count < MATCH_COUNT)
+
+        return cnt;
+    }
+
+    private int CheckDestroyMatchGroupForSection(List<BoardArea> checkArea)
+    {
+        int cnt = 0;
+        bool[,] visited = new bool[BOARD_SIZE, BOARD_SIZE];
+        for (int i = 0; i < checkArea.Count; ++i)
         {
-            _boardAreas[row, col].SetBrick(brick);
-            bricks.Remove(brick);
+            if (DestroyMatchGroup(checkArea[i].row, checkArea[i].col, visited))
+                cnt++;
         }
+
+        return cnt;
+    }
+
+    private bool DestroyMatchGroup(int row, int col, bool[,] visited)
+    {
+        if (_boardAreas[row, col].isEmpty) return false;
+        if (visited[row, col]) return false;
+
+        var bricks = FindMatchGroup(row, col, visited);
+        if (bricks.Count < MATCH_COUNT) return false;
+
+        DestroyBricks(bricks);
+        return true;
+    }
+
+    private void DestroyBricks(List<BoardArea> bricks)
+    {
+        int score = bricks.Count * 10;
+        Bounds bounds = new Bounds(bricks[0].GetPos(), Vector3.zero);
+        bricks.ForEach(b =>
+        {
+            var brick = b.brick;
+            brick.Destroy();
+            _bricks.Enqueue(brick);
+            bounds.Encapsulate(b.GetPos());
+            _boardAreas[b.row, b.col].SetBrick();
+        });
+        _roundManager.DestroyMatchBricks(score, bounds.center);
+    }
+
+    private List<BoardArea> FindMatchGroup(int startR, int startC, bool[,] visited)
+    {
+        var brick = _boardAreas[startR, startC].brick;
+        var bricks = new List<BoardArea>();
+        var queue = new Queue<(int r, int c)>();
+        queue.Enqueue((startR, startC));
+        visited[startR, startC] = true;
+
+        while (queue.Count > 0)
+        {
+            var (r, c) = queue.Dequeue();
+            bricks.Add(_boardAreas[r, c]);
+
+            for (int i = 0; i < 4; ++i)
+            {
+                int nr = r + offset[i].r, nc = c + offset[i].c;
+                if (nr < 0 || nc < 0 || nr >= BOARD_SIZE || nc >= BOARD_SIZE) continue;
+                if (visited[nr, nc] || _boardAreas[nr, nc].isEmpty) continue;
+                if (!_boardAreas[nr, nc].MatchBrickType(brick)) continue;
+
+                visited[nr, nc] = true;
+                queue.Enqueue((nr, nc));
+            }
+        }
+        return bricks;
     }
 
     private List<BoardArea> GetEmptyAreas(int cnt = 2)

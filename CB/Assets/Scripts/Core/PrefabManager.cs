@@ -33,6 +33,17 @@ public class PrefabManager : ReferenceManager<PrefabManager>, IManager
         _dynamicCanvas.MyCanvas.worldCamera = _mainCamera;
     }
 
+    public bool TryGetInstance<TI>(PrefabData type, out TI instance)
+    {
+        instance = default;
+        if (_assetMap.TryGetValue(EnumConverter.Enum32ToInt(type), out var obj) == false)
+            return false;
+
+        instance = obj.instance.GetComponent<TI>();
+        return instance != null;
+    }
+
+
     public async UniTask<TI> InstantiateObject<TI>(PrefabData type, Transform parent = null, bool isProtected = false)
     {
         return await InstantiateObject<TI>(EnumConverter.Enum32ToInt(type), parent, isProtected);

@@ -16,6 +16,6 @@ public enum PrefabData
     LegalUI,
     PopupQuestionUI,
     LoadingUI,
-    InquriyUI,
+    InquiryUI,
     PopupNoticeUI,
 }

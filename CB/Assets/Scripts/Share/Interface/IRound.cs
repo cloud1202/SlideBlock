@@ -4,6 +4,7 @@ using UnityEngine;
 
 public interface IRound
 {
+    public int CurrentScore { get; }
     public event Action OnUpdateSymbolState;
     public UniTask Init();
 

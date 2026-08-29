@@ -16,7 +16,7 @@ public class SingletonInstance<T> : MonoBehaviour
                 {
                     Debug.Log($"Created instance Manager of: {typeof(T)}");
                     GameObject go = new GameObject();
-                    go.name = $"{typeof(T)}(Singletone)";
+                    go.name = $"{typeof(T)}(Singleton)";
                     m_instance = go.AddComponent<T>();
                     DontDestroyOnLoad(go);
                 }
@@ -42,7 +42,7 @@ public class SingletonInstance<T> : MonoBehaviour
             DontDestroyOnLoad(m_instance.gameObject);
         }
         else
-            DestroyImmediate(gameObject);
+            Destroy(gameObject);
     }
 
     protected void Logging(string log)
