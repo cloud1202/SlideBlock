@@ -39,7 +39,6 @@ public class TextDataManager : SingletonInstance<TextDataManager>, IManager
             LLogger.Log($"Not Found Game Text : {data}");
             return string.Empty;
         }
-        //return gt.text[EnumConverter.Enum32ToInt(GameManager.Instance.Language)];
-        return "";
+        return gt.text[EnumConverter.Enum32ToInt(GameManager.Instance.Language)];
     }
 }

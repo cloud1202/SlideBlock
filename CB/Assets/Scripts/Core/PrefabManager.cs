@@ -24,7 +24,7 @@ public class PrefabManager : ReferenceManager<PrefabManager>, IManager
 
     async public UniTask InitLoadObjects()
     {
-        //_mainCamera = await InstantiateObject<Camera>(PrefabData.MainCamera, GameManager.Instance.transform, true);
+        _mainCamera = await InstantiateObject<Camera>(PrefabData.MainCamera, GameManager.Instance.transform, true);
         _staticCanvas = await InstantiateObject<ISafeAreaFitter>(PrefabData.StaticCanvas, this.transform, true);
         _dynamicCanvas = await InstantiateObject<ISafeAreaFitter>(PrefabData.DynamicCanvas, this.transform, true);
         _staticCanvas.InitSafeArea();

@@ -53,7 +53,7 @@ public class GameLobbyUI : BaseUI
 
     public void OnClickClassicBtn()
     {
-       // GameManager.Instance.StartRound().Forget();
+        GameManager.Instance.StartRound().Forget();
     }
 
     private void ChangeResolution(float width, float height, float scaleFactor)
