@@ -37,7 +37,7 @@ public class GameManager : SingletonInstance<GameManager>, IManager
     private IBaseUI _lobbyUI;
     private IBaseUI _loadingUI;
 
-    public float catureEnterTime { get; set; }
+    public float CaptureEnterTime { get; set; }
 
     async public UniTask Bootstrap()
     {
@@ -119,7 +119,7 @@ public class GameManager : SingletonInstance<GameManager>, IManager
         PlayerPrefs.Save();
 
         if (_roundManager != null)
-            FirebaseManager.Instance.LogModePause("Classic", Time.realtimeSinceStartup - catureEnterTime, _roundManager.CurrentScore);
+            FirebaseManager.Instance.LogModePause("Classic", Time.realtimeSinceStartup - CaptureEnterTime, _roundManager.CurrentScore);
 
         FirebaseManager.Instance.Log("App paused");
     }

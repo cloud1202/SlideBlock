@@ -38,7 +38,7 @@ public class RoundManager : MonoBehaviour, IRound
 
     public void EnterRound()
     {
-        GameManager.Instance.catureEnterTime = Time.realtimeSinceStartup;
+        GameManager.Instance.CaptureEnterTime = Time.realtimeSinceStartup;
         FirebaseManager.Instance.LogModeStart("Classic");
         gameObject.SetActive(true);
         _scoreValue = 0;
@@ -61,7 +61,7 @@ public class RoundManager : MonoBehaviour, IRound
 
     public void ExitRound()
     {
-        FirebaseManager.Instance.LogModeQuit("Classic", Time.realtimeSinceStartup - GameManager.Instance.catureEnterTime, _scoreValue);
+        FirebaseManager.Instance.LogModeQuit("Classic", Time.realtimeSinceStartup - GameManager.Instance.CaptureEnterTime, _scoreValue);
         _ingameUI.Close();
         _gameOver.Close();
         Destroy(gameObject);

@@ -252,14 +252,14 @@ public class Board : RoundObject
 
     async private UniTask<bool> DestroyMatches(List<BoardArea> checkArea = null)
     {
-        int destoryMatchGroupCnt = 0;
+        int destroyMatchGroupCnt = 0;
         if (checkArea == null)
-            destoryMatchGroupCnt = CheckDestroyMatchGroupForAll();
+            destroyMatchGroupCnt = CheckDestroyMatchGroupForAll();
         else
-            destoryMatchGroupCnt = CheckDestroyMatchGroupForSection(checkArea);
+            destroyMatchGroupCnt = CheckDestroyMatchGroupForSection(checkArea);
 
         // 사운드 재생
-        if (destoryMatchGroupCnt > 0)
+        if (destroyMatchGroupCnt > 0)
         {
             await SoundManager.Instance.PlaySFX(SoundData.Match);
             await UniTask.WaitForSeconds(0.4f, cancellationToken: _changeDirectionToken.Token);
@@ -309,11 +309,11 @@ public class Board : RoundObject
         var bricks = FindMatchGroup(row, col, visited);
         if (bricks.Count < MATCH_COUNT) return false;
 
-        DestoryBricks(bricks);
+        DestroyBricks(bricks);
         return true;
     }
 
-    private void DestoryBricks(List<BoardArea> bricks)
+    private void DestroyBricks(List<BoardArea> bricks)
     {
         int score = bricks.Count * 10;
         Bounds bounds = new Bounds(bricks[0].GetPos(), Vector3.zero);

@@ -2,7 +2,7 @@ using Cysharp.Threading.Tasks;
 using TMPro;
 using UnityEngine;
 
-public class InquriyUI : BaseUI
+public class InquiryUI : BaseUI
 {
     [SerializeField] private TMP_InputField _email;
     [SerializeField] private TMP_InputField _content;
